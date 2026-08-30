@@ -1,0 +1,10 @@
+include LICENSE
+include SECURITY.md
+include CHANGELOG.md
+include CONTRIBUTING.md
+include .gitattributes
+# mirror the wheel's package data into the sdist
+include src/gpcli/py.typed
+# complete, runnable test suite (setuptools picks up test_*.py implicitly —
+# make the fixtures travel with them)
+recursive-include tests *.py

@@ -1,0 +1,68 @@
+# ------------------------------------------------------------------ Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Packaging / build
+build/
+dist/
+*.egg
+*.egg-info/
+develop-eggs/
+wheels/
+pip-log.txt
+MANIFEST
+
+# ------------------------------------------------------------------ Testing
+.pytest_cache/
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+.hypothesis/
+
+# ------------------------------------------------------------------ Linters / type checkers
+.ruff_cache/
+.mypy_cache/
+.pytype/
+.tox/
+.nox/
+
+# ------------------------------------------------------------------ Environments
+.venv/
+venv/
+ENV/
+env/
+.python-version
+
+# ------------------------------------------------------------------ Editors / IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*.sublime-*
+.ropeproject/
+.history/
+
+# ------------------------------------------------------------------ OS junk
+.DS_Store
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# ------------------------------------------------------------------ Secrets / local config
+.env
+.env.*
+*.local
+
+# ------------------------------------------------------------------ Project runtime artifacts
+# Live CLI sessions (subscriber tokens) captured while dogfooding in this tree
+state.json
+*.state.json
+# Downloads produced by `mygp bill itemized` / `mygp sim certificate`
+*.pdf
+certificate.html
+# Network captures / scratch payloads
+*.har
+*.pcap

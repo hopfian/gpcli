@@ -1,0 +1,83 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "gpcli"
+dynamic = ["version"]
+description = "Reverse-engineered MyGP (Grameenphone) API client - auth, packs, purchase, recharge, transfer, bills"
+readme = "README.md"
+requires-python = ">=3.10"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "Ino" }]
+keywords = [
+    "gpcli",
+    "grameenphone",
+    "mygp",
+    "gp",
+    "cli",
+    "api-client",
+    "reverse-engineering",
+    "telecom",
+    "bangladesh",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Telecommunications Industry",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Topic :: Communications :: Telephony",
+    "Topic :: System :: Networking",
+    "Topic :: Utilities",
+]
+dependencies = [
+    "typer>=0.12",
+    "rich>=13.7",
+    "httpx>=0.27",
+    "pydantic>=2.7",
+    "platformdirs>=4.2",
+    "cryptography>=42.0",
+]
+
+# Fill in when the repository goes public, e.g.:
+# [project.urls]
+# Homepage = "https://github.com/<you>/gpcli"
+# Issues = "https://github.com/<you>/gpcli/issues"
+# Security = "https://github.com/<you>/gpcli/security/policy"
+
+[project.scripts]
+gpcli = "gpcli.main:main"
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0",
+    "ruff>=0.4",
+    "build>=1.2",
+]
+
+[tool.setuptools.dynamic]
+version = { attr = "gpcli.__version__" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+gpcli = ["py.typed"]
+
+[tool.ruff]
+line-length = 110
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+
+[tool.ruff.lint.flake8-bugbear]
+extend-immutable-calls = ["typer.Option", "typer.Argument"]
