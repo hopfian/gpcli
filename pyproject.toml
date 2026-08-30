@@ -48,10 +48,10 @@ dependencies = [
 ]
 
 # Fill in when the repository goes public, e.g.:
-# [project.urls]
-# Homepage = "https://github.com/<you>/gpcli"
-# Issues = "https://github.com/<you>/gpcli/issues"
-# Security = "https://github.com/<you>/gpcli/security/policy"
+[project.urls]
+Homepage = "https://github.com/hopfian/gpcli"
+Issues = "https://github.com/hopfian/gpcli/issues"
+Security = "https://github.com/hopfian/gpcli/security/policy"
 
 [project.scripts]
 gpcli = "gpcli.main:main"

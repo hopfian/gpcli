@@ -77,5 +77,6 @@ price quoter, VAS, the pack catalog with Explore-tab categories, balance
 transfer with PIN management, and usage history. Detailed history was
 not recorded before 1.7.0.
 
-<!-- Add compare links once the repository is hosted, e.g.
-[1.9.0]: https://github.com/<you>/gpcli/compare/v1.8.0...v1.9.0 -->
+[1.9.0]: https://github.com/hopfian/gpcli/commits/v1.9.0
+[1.8.0]: https://github.com/hopfian/gpcli/commits/main
+[1.7.0]: https://github.com/hopfian/gpcli/commits/main

@@ -1,15 +1,16 @@
 version: 2
 updates:
-  - package-ecosystem: pip
-    directory: "/"
-    schedule:
-      interval: weekly
-    commit-message:
-      prefix: chore(deps)
-
+  # Action versions deprecate and break over time (e.g. upload-artifact 4 -> 7)
+  # — these updates have real value and stay.
   - package-ecosystem: github-actions
     directory: "/"
     schedule:
       interval: weekly
     commit-message:
       prefix: chore(ci)
+
+  # Python dependency updates are deliberately disabled:
+  # - this package is not published to PyPI; version ranges are intentionally
+  #   permissive minimums for research use (see SECURITY.md)
+  # - vulnerability coverage is handled by the CI `audit` job, which runs
+  #   pip-audit over the actually-resolved dependency tree on every push
