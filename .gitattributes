@@ -1,0 +1,20 @@
+# Normalize line endings (developed on Windows; contributors may not be)
+* text=auto
+
+# Sources
+*.py   text diff=python
+*.md   text
+*.toml text
+*.yml  text
+*.yaml text
+*.json text
+*.txt  text
+*.in   text
+*.cfg  text
+
+# Binary — never normalize
+*.png  binary
+*.jpg  binary
+*.ico  binary
+*.pdf  binary
+*.pyc  binary
