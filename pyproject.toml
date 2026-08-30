@@ -44,7 +44,7 @@ dependencies = [
     "httpx>=0.27",
     "pydantic>=2.7",
     "platformdirs>=4.2",
-    "cryptography>=42.0",
+    "cryptography>=50.0.1",
 ]
 
 # Fill in when the repository goes public, e.g.:
