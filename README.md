@@ -4,7 +4,7 @@ A fully reverse-engineered command-line client for **MyGP** — Grameenphone's
 subscriber super-app (`com.portonics.mygp` 5.31.0, versionCode 530). Built
 from static analysis of the decompiled APK (jadx + apktool smali), with
 every flow live-validated against the production API and the wire formats
-frozen under a 130-test suite.
+frozen under a 140-test suite.
 
 ```
 $ gpcli me
@@ -18,9 +18,9 @@ $ gpcli me
 
 | | |
 |---|---|
-| Version | 1.9.0 (src-layout, Python ≥ 3.10) |
+| Version | 1.10.0 (src-layout, Python ≥ 3.10) |
 | Command groups | 24 subcommand groups + 8 root commands |
-| Test suite | 130 tests, ruff-clean |
+| Test suite | 140 tests, ruff-clean |
 | Coverage | auth (3 flows) · account · catalog/flexiplan · purchase/recharge · transfer · bills · autopay · rewards · roaming · SIM/FnF/MCA/WT/netcare · partners · raw |
 
 > **Status note:** every read path is live-verified. The money paths
@@ -310,13 +310,44 @@ config). The CLI prints the same URLs (or opens them with `--open`); the
 ### Purchase & recharge
 
 ```
-gpcli purchase pack 4575                      # find by id or keyword, confirm, buy
-gpcli purchase pack 1GB_BOOSTER --amount 19   # explicit recharge amount
-gpcli purchase pack 4575 --legacy             # free/PAYG-style packs (campaign-activate)
-gpcli recharge gateway 20 [--open]            # payment/bkash/rocket WebView URLs
-gpcli recharge pay 50 --provider bkash --identifier <id>   # direct wallet payment
-gpcli recharge offers | history | numbers
+gpcli recharge gateway 20 [--open]        # single-use: one-time payment session
+gpcli recharge saved                       # bound methods + one-tap identifiers
+gpcli recharge bind nagad [--open]         # bind once (provider auth page)
+gpcli recharge pay 20 --provider nagad     # instant one-tap from bound wallet
+gpcli recharge unbind bkash                # remove a binding
+gpcli purchase pack 4234                   # buy from main balance (--legacy path)
 ```
+
+**Verified with real money** (2026-09-06):
+
+* **Single-use recharge** — `POST /recharge` returns a one-time payment
+  session (`payment_url` + `transaction_id` + campaign codes). Paying it
+  with **Nagad** in a browser completed end-to-end: the provider redirects
+  back to `mygpapi/recharge-return?...status=success&service_provider=NAGAD`
+  and the balance lands instantly (the MyGP-40% campaign arrives later as
+  cashback). No method is saved.
+* **Binding** — `POST payment-gateway/bind/{id}` (headers
+  `REMAINING-OPEN-INTERNET`, `wifi`) returns the provider's auth page
+  (Nagad's in-app, bKash's `directcharge.payment.bkash.com`); completion
+  redirects to `mygpapi/bind?...identifier=<token>&status=success`. Bound
+  methods live in `GET /balance` → `connected_payment_methods[]` with
+  opaque base64 `identifier` tokens that round-trip verbatim through
+  bind → unbind → rebind.
+* **Buy from main balance** — `purchase pack <id> --legacy`
+  (`POST /campaign-activate/`) is async `{status: pending, ticketid}`,
+  provisioned within seconds (5.99 BDT test: 183.38 → 177.39, 28 → 78 SMS).
+* `purchase pack <id>` without `--provider/--identifier` is the
+  **gateway-recharge** path — the server rejects it with
+  `500 "No number is bind with your account"` unless a payment method is
+  bound to the account.
+
+**Headers the money endpoints need** (decoded from `RechargeRepositoryImpl`):
+`X-Analytics-ID` = hex(AES-CTR(auth msisdn, key/iv from `AnalyticsIdUtil`
+— see `crypto.py`)) and `X-Service-Class-A` from balance. The
+recharge-and-activate `pack_data` also requires a numeric
+`service_class` (from balance) — the server rejects null with
+`service_class should be a numeric value.` Money endpoints rate-limit:
+**429 "Too many request, try after 5 minutes"** on rapid attempts.
 
 **Flow semantics** (from the app): `POST /recharge` returns per-MFS payment
 URLs (the app loads them in a payment WebView — the CLI prints them, `--open`
@@ -326,6 +357,18 @@ and returns `data.status`: `"action_required"` → `data.url.payment_url`
 (complete payment there), `"success"/"pending"` → done. The wallet path
 (`payment-gateway/payment`) completes without any URL — success only when
 `status == "success"`. All purchase commands are confirmation-gated.
+
+**Verified with real money** (2026-09-06, 5.99 BDT):
+
+* `purchase pack <id> --legacy` (`POST /campaign-activate/`) is the
+  **buy-from-main-balance** path — async `{status: "pending", ticketid}`
+  response, provisioned within seconds (balance 183.38 → 177.39 BDT,
+  28 → 78 SMS). Use this when you already have balance.
+* `purchase pack <id>` without `--provider/--identifier` is the
+  **gateway-recharge** path — the server rejects it with
+  `500 "No number is bind with your account"` unless a payment method is
+  bound to the account. That's the flow the app's payment WebView serves;
+  run it with wallet params or complete the `action_required` URL.
 
 Endpoints behind them:
 
@@ -411,7 +454,7 @@ a service module if the logic is non-trivial, one line in `main.py`'s
 ## Testing & development
 
 ```
-python -m pytest tests -q   # 130 tests, hermetic (MockTransport, one-shot routes)
+python -m pytest tests -q   # 140 tests, hermetic (MockTransport, one-shot routes)
 python -m ruff check src tests
 pip install -e .
 ```
@@ -457,11 +500,16 @@ Two scope notes worth being explicit about:
 
 Shipped since the first release: flexiplan show/quote, VAS management,
 itemized bills, payment history + saved payment methods, FnF/Welcome-Tune
-management, gamification, purchase & recharge, and the v1.9.0 production
-refactor (PII purge, SOLID architecture). Still open:
+management, gamification, purchase & recharge, the v1.9.0 production
+refactor (PII purge, SOLID architecture), and the v1.10.0 payment-method
+family — all money paths verified with real transactions (single-use
+Nagad recharge, bind/unbind/rebind, one-tap bound-wallet purchase,
+balance purchase). Still open:
 
-- [ ] Funded live-test of `purchase pack` / `recharge pay` — the bodies are
-  live-validated and the flows are confirmation-gated, but no money has moved
+- [ ] Plain wallet recharge (`recharge pay` without a pack) — the
+  `payment-gateway/payment` endpoint returned `500` in manual testing; it
+  may be reserved for server-driven low-balance flows. The pack-purchase
+  path with a bound wallet is the verified alternative.
 - [ ] Flexiplan purchase (`v2/flexiplan/purchase`) — legacy endpoint with no
   in-app callers (dead code); wire only if it proves functional
 - [ ] Marketplace add-on cart purchase (`v1/marketplace/cart/purchase`)

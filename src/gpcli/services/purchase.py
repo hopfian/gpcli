@@ -40,15 +40,21 @@ from gpcli.bodies import (
     pack_recharge_journey,
 )
 from gpcli.client import ApiCaller, AuthMode
+from gpcli.crypto import analytics_id
+from gpcli.errors import AuthRequiredError
 from gpcli.models import (
+    ConnectedPaymentMethod,
     MakePaymentResult,
     PackItem,
     PaymentHistory,
+    PaymentMethodBindResponse,
+    PaymentMethodItem,
     RechargeAndActivateResponse,
     RechargeGatewayResult,
     RechargeOffer,
 )
 from gpcli.msisdn import local_msisdn, normalize_msisdn
+from gpcli.services.autopay import PAYMENT_METHODS_ENDPOINT
 from gpcli.services.catalog import CatalogService
 from gpcli.services.offers import CAMPAIGN_ACTIVATE_ENDPOINT
 
@@ -57,6 +63,8 @@ PAYMENT_GATEWAY_ENDPOINT = "/payment-gateway/payment"
 RECHARGE_AND_ACTIVATE_ENDPOINT = "/recharge-and-activate"
 RECHARGE_OFFER_ENDPOINT = "/recharge/offer"
 PAYMENT_HISTORY_ENDPOINT = "/orders/v1/bill-payments"
+BIND_ENDPOINT = "/payment-gateway/bind/{id}"
+UNBIND_ENDPOINT = "/payment-gateway/unbind/{id}"
 
 
 def _eb_due_from(balance: dict[str, Any]) -> float:
@@ -73,6 +81,26 @@ def _balance_snapshot(client: ApiCaller) -> dict[str, Any]:
         return data if isinstance(data, dict) else {}
     except Exception:
         return {}
+
+
+def _session_msisdn(client: ApiCaller, msisdn: str) -> str:
+    """Resolve the effective msisdn (880-format), 880-formatting it.
+
+    Raises AuthRequiredError (not a confusing normalization error) when
+    there is no session and no explicit msisdn.
+    """
+    if msisdn:
+        return normalize_msisdn(msisdn)
+    auth = client.state.auth
+    if auth and auth.msisdn:
+        return normalize_msisdn(auth.msisdn)
+    raise AuthRequiredError("no session msisdn — log in or pass --msisdn")
+
+
+def _account_type(balance: dict[str, Any]) -> tuple[str, str]:
+    """(TYPE, connection_type) from the live balance — e.g. (PREPAID, prepaid)."""
+    kind = str(balance.get("type") or "prepaid").strip().lower() or "prepaid"
+    return kind.upper(), kind
 
 
 class PurchaseService:
@@ -101,6 +129,67 @@ class PurchaseService:
         )
         return PaymentHistory.model_validate(data if isinstance(data, dict) else {})
 
+    # ------------------------------------------------------ payment methods
+
+    def bound_payment_methods(self) -> list[ConnectedPaymentMethod]:
+        """Bound methods from `GET /balance` -> connected_payment_methods[].
+
+        The `identifier` token is what the payment-gateway endpoints expect
+        back (it round-trips verbatim through bind/unbind/one-tap payment).
+        """
+        balance = _balance_snapshot(self.client)
+        items = balance.get("connected_payment_methods") or []
+        return [ConnectedPaymentMethod.model_validate(i) for i in items if isinstance(i, dict)]
+
+    def resolve_identifier(self, payment_method_id: str) -> ConnectedPaymentMethod | None:
+        """Find the bound method (by type, e.g. 'nagad') for one-tap use."""
+        wanted = payment_method_id.lower()
+        for method in self.bound_payment_methods():
+            if method.type.lower() == wanted and method.bind_status == 1:
+                return method
+        return None
+
+    def payment_methods(self) -> list[PaymentMethodItem]:
+        """`GET v2/payment-methods` — bindable methods (bkash, nagad, card)."""
+        data = self.client.get_json(
+            "GET", PAYMENT_METHODS_ENDPOINT, auth_mode=AuthMode.SUBSCRIBER
+        )
+        items = data.get("data", []) if isinstance(data, dict) else []
+        return [PaymentMethodItem.model_validate(i) for i in items if isinstance(i, dict)]
+
+    def bind_payment_method(self, payment_method_id: str) -> PaymentMethodBindResponse:
+        """`POST payment-gateway/bind/{id}` — returns the provider's auth URL.
+
+        The app (PaymentMethodBindingWebViewActivity.fetchBindingUrl) sends
+        ``REMAINING-OPEN-INTERNET`` (remaining MB from GET /balance) and
+        ``wifi`` ("0"/"1") headers; the response ``data.url`` is opened in
+        a WebView where the user authenticates with the provider.
+        """
+        balance = _balance_snapshot(self.client)
+        remaining = ""
+        details = balance.get("internet_details") or {}
+        if isinstance(details, dict) and details.get("value"):
+            try:
+                remaining = str(int(float(details["value"])))
+            except (TypeError, ValueError):
+                remaining = str(details["value"])
+        headers = {
+            "REMAINING-OPEN-INTERNET": remaining,
+            "wifi": "0",  # CLI runs off-device; the app sends its connection type
+        }
+        data = self.client.get_json(
+            "POST", BIND_ENDPOINT.format(id=payment_method_id),
+            headers=headers, auth_mode=AuthMode.SUBSCRIBER,
+        )
+        return PaymentMethodBindResponse.model_validate(data if isinstance(data, dict) else {})
+
+    def unbind_payment_method(self, payment_method_id: str, identifier: str) -> dict:
+        """`POST payment-gateway/unbind/{id}` (form) with `identifier`."""
+        return self.client.get_json(
+            "POST", UNBIND_ENDPOINT.format(id=payment_method_id),
+            data={"identifier": identifier}, auth_mode=AuthMode.SUBSCRIBER,
+        )
+
     # ------------------------------------------------------------- gateway
 
     def recharge_gateway(
@@ -112,11 +201,10 @@ class PurchaseService:
         pack: PackItem | None = None,
     ) -> RechargeGatewayResult:
         """`POST /recharge` — the `Recharge` object; returns MFS payment URLs."""
-        state = self.client.state
-        auth = state.auth
-        msisdn_880 = normalize_msisdn(msisdn or (auth.msisdn if auth else "8801"))
+        msisdn_880 = _session_msisdn(self.client, msisdn)
         email = f"{msisdn_880}@grameenphone.com"
         balance = _balance_snapshot(self.client)
+        account_type, connection_type = _account_type(balance)
         body: dict[str, Any] = {
             "name": msisdn_880,
             "mobile": local_msisdn(msisdn_880),
@@ -124,9 +212,9 @@ class PurchaseService:
             "platform": "android",
             "amount": amount,
             "channel": channel or self._pack_channel(pack),
-            "type": "PREPAID",
+            "type": account_type,  # app: Recharge.TYPE — PREPAID/POSTPAID
             "main_balance": str(balance.get("balance", 0) or 0),
-            "connection_type": "prepaid",
+            "connection_type": connection_type,
             "eb_due": _eb_due_from(balance),
             "date": "",
             "zero_rated": 0,
@@ -150,9 +238,6 @@ class PurchaseService:
             "POST", RECHARGE_ENDPOINT, json_body=body, auth_mode=AuthMode.SUBSCRIBER
         )
         return RechargeGatewayResult.model_validate(data if isinstance(data, dict) else {})
-
-    def _main_balance(self) -> str:
-        return str(_balance_snapshot(self.client).get("balance", 0) or 0)
 
     @staticmethod
     def _pack_channel(pack: PackItem | None) -> str:
@@ -181,9 +266,7 @@ class PurchaseService:
         channel: str = "",
     ) -> MakePaymentResult:
         """`POST /payment-gateway/payment` — MakePaymentBody."""
-        state = self.client.state
-        auth = state.auth
-        msisdn_880 = normalize_msisdn(msisdn or (auth.msisdn if auth else "8801"))
+        msisdn_880 = _session_msisdn(self.client, msisdn)
         balance = _balance_snapshot(self.client)
         body = {
             "amount": str(amount),
@@ -191,7 +274,7 @@ class PurchaseService:
             "service_provider": provider,
             "eb_due": _eb_due_from(balance),
             "campaign_code": None,
-            "channel": channel or "direct_recharge_offer",
+            "channel": channel,  # app: URI-driven subchannel; plain path sends it through
             "pack_name": None,
             "crm_keyword": None,
             "main_balance": str(balance.get("balance", 0) or 0),
@@ -201,11 +284,14 @@ class PurchaseService:
             "is_new_user": 0,
             "catalog_id": None,
             "card_id": None,
-            "connection_type": "prepaid",
+            "connection_type": None,  # app sends null on the wallet path (AutoPayRechargeHelper)
             "b_party_connection_type": None,
         }
         data = self.client.get_json(
-            "POST", PAYMENT_GATEWAY_ENDPOINT, json_body=body, auth_mode=AuthMode.SUBSCRIBER
+            "POST", PAYMENT_GATEWAY_ENDPOINT,
+            json_body=body,
+            headers=self._purchase_headers(balance),
+            auth_mode=AuthMode.SUBSCRIBER,
         )
         return MakePaymentResult.model_validate(data if isinstance(data, dict) else {})
 
@@ -222,9 +308,7 @@ class PurchaseService:
         identifier: str = "",
     ) -> RechargeAndActivateResponse:
         """`POST /recharge-and-activate` — the modern pack-purchase flow."""
-        state = self.client.state
-        auth = state.auth
-        msisdn_880 = normalize_msisdn(msisdn or (auth.msisdn if auth else "8801"))
+        msisdn_880 = _session_msisdn(self.client, msisdn)
         amount = recharge_amount if recharge_amount is not None else int(pack.price_value or 0)
         balance = _balance_snapshot(self.client)
 
@@ -237,7 +321,10 @@ class PurchaseService:
             eb_due=_eb_due_from(balance),
             pack=pack,
         )
-        pack_data = build_pack_data(pack, msisdn_880, otp=otp, recharge=amount)
+        pack_data = build_pack_data(
+            pack, msisdn_880, otp=otp, recharge=amount,
+            service_class=str(balance.get("service_class") or ""),
+        )
         body = {
             "recharge_data": recharge_data,
             "pack_data": pack_data,
@@ -256,8 +343,7 @@ class PurchaseService:
 
     def purchase_legacy(self, pack: PackItem, *, msisdn: str = "") -> dict:
         """`POST /campaign-activate/` — the legacy activation (free/PAYG packs)."""
-        auth = self.client.state.auth
-        msisdn_880 = normalize_msisdn(msisdn or (auth.msisdn if auth else "8801"))
+        msisdn_880 = _session_msisdn(self.client, msisdn)
         return self.client.get_json(
             "POST", CAMPAIGN_ACTIVATE_ENDPOINT,
             json_body=campaign_activate_body(pack, msisdn_880),
@@ -265,7 +351,17 @@ class PurchaseService:
         )
 
     def _purchase_headers(self, balance: dict[str, Any] | None = None) -> dict[str, str]:
-        """X-Service-Class-A from balance; B party unknown for CLI purchases."""
+        """X-Analytics-ID + X-Service-Class-A/B (RechargeRepositoryImpl).
+
+        The analytics id is AnalyticsIdUtil's AES-CTR-hex of the auth msisdn;
+        the B-party class is only set for other-number recharges.
+        """
         balance = balance if balance is not None else _balance_snapshot(self.client)
+        headers: dict[str, str] = {}
+        auth = self.client.state.auth
+        if auth and auth.msisdn:
+            headers["X-Analytics-ID"] = analytics_id(auth.msisdn)
         service_class = balance.get("service_class")
-        return {"X-Service-Class-A": str(service_class)} if service_class else {}
+        if service_class:
+            headers["X-Service-Class-A"] = str(service_class)
+        return headers

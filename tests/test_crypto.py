@@ -3,9 +3,12 @@
 import pytest
 
 from gpcli.crypto import (
+    ANALYTICS_IV,
+    ANALYTICS_KEY,
     STATIC_IV,
     STATIC_KEY,
     _aes_ctr,
+    analytics_id,
     build_silent_login,
     decrypt_hex,
     decrypt_static,
@@ -20,6 +23,15 @@ def test_static_roundtrip():
     ciphertext = encrypt_static(plaintext)
     assert ciphertext == _aes_ctr(STATIC_KEY, STATIC_IV, plaintext.encode()).hex()
     assert decrypt_static(ciphertext) == plaintext
+
+
+def test_analytics_id_deterministic_and_hex():
+    value = analytics_id("8801700000000")
+    assert value == encrypt_hex("8801700000000", ANALYTICS_IV, ANALYTICS_KEY)
+    assert value == analytics_id("8801700000000")  # stable per msisdn
+    assert len(value) == 26  # 13-byte msisdn -> 26 hex chars
+    assert all(c in "0123456789abcdef" for c in value)
+    assert analytics_id("8801700000000") != analytics_id("8801700000001")
 
 
 def test_static_hex_is_lowercase():

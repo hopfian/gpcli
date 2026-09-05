@@ -79,6 +79,23 @@ class EmergencyBalance(BaseModel):
         return math.ceil(max(self.due, 0.0) + max(self.data_loan, 0.0))
 
 
+class ConnectedPaymentMethod(BaseModel):
+    """`GET /balance` -> connected_payment_methods[] — a bound payment method.
+
+    `identifier` is the opaque (base64) token the payment-gateway endpoints
+    expect back verbatim; `wallet_no` arrives masked server-side.
+    """
+
+    model_config = ConfigDict(extra="allow")
+
+    type: str = ""  # bkash | nagad | card
+    wallet_no: str = ""
+    bind_status: int = 0  # 1 = bound
+    is_preferred: bool = False
+    identifier: str = ""
+    wallet_icon: str = ""
+
+
 class Balance(BaseModel):
     """GET /balance — main + package balances (subset; everything else passthrough)."""
 
@@ -94,4 +111,5 @@ class Balance(BaseModel):
     expiry: dict[str, Any] | None = None
     internet_packs: list[dict[str, Any]] = Field(default_factory=list)
     sms_packs: list[dict[str, Any]] = Field(default_factory=list)
+    connected_payment_methods: list[ConnectedPaymentMethod] = Field(default_factory=list)
     error: ErrorInfo | None = None

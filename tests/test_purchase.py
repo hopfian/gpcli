@@ -140,6 +140,55 @@ class TestPurchaseServiceWiring:
         assert service.find_pack("1GB_1D").id == "4575"
         assert service.find_pack("nonexistent") is None
 
+    def test_bound_methods_and_resolution(self, make_client):
+        client, rec = make_client()
+        balance = {
+            "balance": 100,
+            "connected_payment_methods": [
+                {"type": "bkash", "wallet_no": "013#####227", "bind_status": 1,
+                 "is_preferred": False, "identifier": "TkVBUEFTSA=="},
+                {"type": "nagad", "wallet_no": "017#####798", "bind_status": 1,
+                 "is_preferred": True, "identifier": "TkFHSUQ="},
+                {"type": "card", "wallet_no": "", "bind_status": 0,
+                 "identifier": "Tk9QRQ=="},
+            ],
+        }
+        for _ in range(5):  # one-shot routes: 1 list + 4 resolves
+            rec.add("GET", "/balance", json=balance)
+        service = PurchaseService(client)
+        bound = service.bound_payment_methods()
+        assert len(bound) == 3
+
+        nagad = service.resolve_identifier("NAGAD")
+        assert nagad is not None and nagad.identifier == "TkFHSUQ="
+        assert nagad.is_preferred is True
+
+        bkash = service.resolve_identifier("bkash")
+        assert bkash is not None and bkash.wallet_no == "013#####227"
+
+        assert service.resolve_identifier("card") is None  # bind_status 0 — not usable
+        assert service.resolve_identifier("unknown") is None
+
+    def test_pay_auto_resolves_identifier(self, make_client):
+        client, rec = make_client()
+        rec.add("GET", "/balance", json={
+            "balance": 5,
+            "connected_payment_methods": [
+                {"type": "nagad", "wallet_no": "017#####798", "bind_status": 1,
+                 "is_preferred": True, "identifier": "TkFHSUQ="},
+            ],
+        })
+        rec.add("GET", "/balance", json={"balance": 5})  # pay()'s snapshot
+        rec.add("POST", "/payment-gateway/payment",
+                json={"code": 200, "status": "success", "data": {"remarks": "ok"}})
+        service = PurchaseService(client)
+        bound = service.resolve_identifier("nagad")
+        result = service.pay("20", provider="nagad", identifier=bound.identifier)
+        body = json.loads(rec.requests[-1].content)
+        assert body["service_provider"] == "nagad"
+        assert body["identifier"] == "TkFHSUQ="
+        assert result.ok is True
+
     def test_pack_channel_derivation(self):
         assert PurchaseService._pack_channel(None) == ""
         pack = _pack(attributes=["recharge_journey_offer"])
@@ -168,3 +217,79 @@ class TestResponseModels:
         assert MakePaymentResult(status="success").ok
         assert not MakePaymentResult(status="pending").ok  # wallet: success only
         assert not MakePaymentResult(status="failed").ok
+
+    def test_direct_recharge_int_coercion(self):
+        from gpcli.models import DirectRechargeData
+
+        # the server sends dueAmount as an int despite the String schema
+        data = DirectRechargeData.model_validate({
+            "dueAmount": 0, "rechargeAmount": 20,
+            "recharge_transaction_id": 12345, "serviceProvider": "NAGAD",
+        })
+        assert data.dueAmount == "0"
+        assert data.recharge_transaction_id == "12345"
+        assert data.rechargeAmount == 20  # int field stays int
+        assert data.serviceProvider == "NAGAD"
+
+
+class TestSessionMsisdn:
+    def test_no_session_raises_auth_required(self, make_client, state):
+        state.auth = None
+        client, _ = make_client()
+        import pytest
+
+        from gpcli.errors import AuthRequiredError
+
+        with pytest.raises(AuthRequiredError):
+            PurchaseService(client).pay("20", provider="nagad", identifier="T")
+
+    def test_explicit_msisdn_beats_session(self, make_client, state):
+        client, rec = make_client()
+        rec.add("GET", "/balance", json={"balance": 1, "type": "prepaid"})
+        rec.add("POST", "/payment-gateway/payment",
+                json={"code": 200, "status": "success", "data": {}})
+        PurchaseService(client).pay("20", provider="bkash",
+                                     identifier="T", msisdn="01712345678")
+        body = json.loads(rec.requests[-1].content)
+        assert body["recharge_msisdn"] == "01712345678"
+
+    def test_gateway_derives_postpaid_type(self, make_client):
+        client, rec = make_client()
+        rec.add("GET", "/balance", json={"balance": 5, "type": "postpaid"})
+        rec.add("POST", "/recharge", json={"payment_url": "https://pay.example/x"})
+        PurchaseService(client).recharge_gateway(50)
+        body = json.loads(rec.requests[-1].content)
+        assert body["type"] == "POSTPAID"
+        assert body["connection_type"] == "postpaid"
+
+
+class TestBindFlow:
+    def test_bind_headers_from_balance(self, make_client):
+        client, rec = make_client()
+        rec.add("GET", "/balance", json={
+            "balance": 10,
+            "internet_details": {"value": "1024.0", "unit": "MB"},
+        })
+        rec.add("POST", "/payment-gateway/bind/nagad",
+                json={"status": "success", "data": {"url": "https://nagad.example/x"}})
+        result = PurchaseService(client).bind_payment_method("nagad")
+        request = rec.requests[-1]
+        assert request.headers["REMAINING-OPEN-INTERNET"] == "1024"
+        assert request.headers["wifi"] == "0"
+        assert result.url == "https://nagad.example/x"
+
+    def test_bind_headers_empty_without_details(self, make_client):
+        client, rec = make_client()
+        rec.add("GET", "/balance", json={"balance": 10})
+        rec.add("POST", "/payment-gateway/bind/bkash", json={"status": "success", "data": {}})
+        PurchaseService(client).bind_payment_method("bkash")
+        assert rec.requests[-1].headers["REMAINING-OPEN-INTERNET"] == ""
+
+    def test_purchase_headers_carry_analytics_id(self, make_client):
+        from gpcli.crypto import analytics_id
+
+        client, rec = make_client()
+        rec.add("GET", "/balance", json={"balance": 1, "service_class": 456})
+        headers = PurchaseService(client)._purchase_headers()  # noqa: SLF001 — under test
+        assert headers["X-Analytics-ID"] == analytics_id(MSISDN_880)
+        assert headers["X-Service-Class-A"] == "456"

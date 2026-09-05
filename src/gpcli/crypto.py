@@ -27,6 +27,17 @@ from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 STATIC_KEY = b"Lk5Uz3slx3BrAghS1=aW5AYgWZRV0tIX"
 STATIC_IV = b"6119443eb39dc954"
 
+# AnalyticsIdUtil's own pair (used to derive the X-Analytics-ID header):
+# hex(AES-CTR(msisdn, iv=ANALYTICS_IV, key=ANALYTICS_KEY)); the setting key
+# it is stored under is Utils.T(msisdn) = MD5(msisdn).hex().
+ANALYTICS_KEY = b"1234567890abcdef1234567890abcdef"
+ANALYTICS_IV = b"1234567890abcdef"
+
+
+def analytics_id(msisdn: str) -> str:
+    """X-Analytics-ID — AnalyticsIdUtil.b()/a() over the auth msisdn."""
+    return encrypt_hex(msisdn, ANALYTICS_IV, ANALYTICS_KEY)
+
 
 def _aes_ctr(key: bytes, iv: bytes, data: bytes) -> bytes:
     if len(key) not in (16, 24, 32):

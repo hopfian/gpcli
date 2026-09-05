@@ -11,7 +11,14 @@ Consumers should keep importing from the package root
 organization, not a public surface.
 """
 
-from gpcli.models.account import Balance, EmergencyBalance, Me, Profile, UsageDetail
+from gpcli.models.account import (
+    Balance,
+    ConnectedPaymentMethod,
+    EmergencyBalance,
+    Me,
+    Profile,
+    UsageDetail,
+)
 from gpcli.models.auth import (
     Auth,
     GuestLoginResponse,
@@ -72,6 +79,9 @@ from gpcli.models.purchase import (
     MakePaymentResult,
     PaymentHistory,
     PaymentHistoryItem,
+    PaymentMethodBindData,
+    PaymentMethodBindResponse,
+    PaymentMethodItem,
     RechargeAndActivateData,
     RechargeAndActivateResponse,
     RechargeGatewayResult,
@@ -95,6 +105,7 @@ __all__ = [
     "UsageDetail",
     "Balance",
     "EmergencyBalance",
+    "ConnectedPaymentMethod",
     # catalog
     "FlexiMap",
     "FlexiSelected",
@@ -146,6 +157,9 @@ __all__ = [
     "RechargeOffer",
     "PaymentHistoryItem",
     "PaymentHistory",
+    "PaymentMethodItem",
+    "PaymentMethodBindData",
+    "PaymentMethodBindResponse",
     "RechargeGatewayResult",
     "DirectRechargeData",
     "RechargeAndActivateData",

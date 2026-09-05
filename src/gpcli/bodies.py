@@ -88,7 +88,8 @@ def build_recharge_data(
 
 
 def build_pack_data(
-    pack: PackItem, msisdn: str, *, otp: str = "", recharge: int | None = None
+    pack: PackItem, msisdn: str, *, otp: str = "", recharge: int | None = None,
+    service_class: str = "",
 ) -> dict[str, Any]:
     """`pack_data` — the Api.l() body plus the RechargeAndActivateUseCase additions."""
     body: dict[str, Any] = {
@@ -112,7 +113,8 @@ def build_pack_data(
         ),
         "dynamic_eb": "0",
         "myplan_id": None,
-        "service_class": None,
+        # Api.l puts subscriber.serviceClass.toString() — the server rejects null
+        "service_class": service_class or None,
         "bonus_amount": "0",
         "recharge_transaction_id": None,
         "hash": None,
