@@ -4,23 +4,30 @@ A fully reverse-engineered command-line client for **MyGP** — Grameenphone's
 subscriber super-app (`com.portonics.mygp` 5.31.0, versionCode 530). Built
 from static analysis of the decompiled APK (jadx + apktool smali), with
 every flow live-validated against the production API and the wire formats
-frozen under a 158-test suite.
+frozen under a 193-test suite.
 
 ```
 $ gpcli me
-+------------------------------ MyGP Subscriber ------------------------------+
-|         name  GP Subscriber                                                 |
-|       msisdn  8801700000000                                                 |
-|        email  …                                                             |
-|   member since  2021-01-13 19:57:09                                         |
-+-----------------------------------------------------------------------------+
+╭────────────────────────────── MyGP Subscriber ───────────────────────────────╮
+│         name  GP Subscriber                                                  │
+│       msisdn  8801700000000                                                  │
+│        email  subscriber@example.com                                         │
+│      address  Gulshan Avenue, Dhaka                                          │
+│       gender  Female                                                         │
+│      NID DOB  1990-01-01                                                     │
+│       status  active                                                         │
+│   connect id  6755000000000000000                                            │
+│ member since  2023-06-15 10:30:00                                            │
+│ login method  OTP                                                            │
+│    interests  sports,music,travel                                            │
+╰──────────────────────────────────────────────────────────────────────────────╯
 ```
 
 | | |
 |---|---|
-| Version | 1.10.0 (src-layout, Python ≥ 3.10) |
+| Version | 1.11.1 (src-layout, Python ≥ 3.10) |
 | Command groups | 24 subcommand groups + 8 root commands |
-| Test suite | 158 tests, ruff + mypy clean |
+| Test suite | 193 tests, ruff + mypy clean |
 | Coverage | auth (3 flows) · account · catalog/flexiplan · purchase/recharge · transfer · bills · autopay · rewards · roaming · SIM/FnF/MCA/WT/netcare · partners · raw |
 
 > **Status note:** every read path is live-verified, and the money paths are
@@ -457,7 +464,7 @@ a service module if the logic is non-trivial, one line in `main.py`'s
 ## Testing & development
 
 ```
-python -m pytest tests -q   # 158 tests, hermetic (MockTransport, one-shot routes)
+python -m pytest tests -q   # 193 tests, hermetic (MockTransport, one-shot routes)
 python -m ruff check src tests
 pip install -e .
 ```

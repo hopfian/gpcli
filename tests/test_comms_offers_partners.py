@@ -2,8 +2,10 @@
 
 import json
 
+import pytest
 from constants import MSISDN_880
 
+from gpcli.errors import MyGPError
 from gpcli.models import (
     BiometricSimList,
     FnfList,
@@ -15,7 +17,7 @@ from gpcli.models import (
 from gpcli.services.fnf import FnfService
 from gpcli.services.mca import McaService
 from gpcli.services.netcare import NetworkComplainService
-from gpcli.services.offers import campaign_activate_body
+from gpcli.services.offers import OffersService, campaign_activate_body
 from gpcli.services.partners import PartnerService
 from gpcli.services.sim import SimService
 from gpcli.services.welcome_tune import WelcomeTuneService
@@ -200,3 +202,75 @@ class TestPartnerService:
 def test_certificate_model_limit():
     cert = SimOwnershipCertificate.model_validate({"status": "failed"})
     assert not cert.ok
+
+
+class TestPaygToggleBodies:
+    """PAYG rides campaign-activate with the pay_go_on/pay_go_off packs."""
+
+    @staticmethod
+    def _catalog(rec, *, with_payg: bool = True) -> None:
+        items = [{"id": "4575", "keyword": "1GB_1D", "type": "internet", "price": "19"}]
+        if with_payg:
+            items += [
+                {"id": "9001", "keyword": "PAYG_ON", "type": "internet", "price": "0",
+                 "attributes": ["pay_go_on"]},
+                {"id": "9002", "keyword": "PAYG_OFF", "type": "internet", "price": "0",
+                 "attributes": ["pay_go_off"]},
+            ]
+        rec.add("GET", "/v3/catalogs", json={"catalogs": items})
+        rec.add("POST", "/campaign-activate/", json={"status": "success"})
+
+    def test_on_uses_the_pay_go_on_pack(self, make_client, state):
+        client, rec = make_client()
+        self._catalog(rec)
+        OffersService(client).payg_toggle(True)
+        body = json.loads(rec.requests[-1].content)
+        assert body["campaign_id"] == "PAYG_ON"
+        assert body["msisdn"] == MSISDN_880
+
+    def test_off_uses_the_pay_go_off_pack(self, make_client, state):
+        client, rec = make_client()
+        self._catalog(rec)
+        OffersService(client).payg_toggle(False)
+        body = json.loads(rec.requests[-1].content)
+        assert body["campaign_id"] == "PAYG_OFF"
+
+    def test_missing_pack_raises_mygp_error(self, make_client, state):
+        client, rec = make_client()
+        self._catalog(rec, with_payg=False)
+        with pytest.raises(MyGPError, match="pay_go_on"):
+            OffersService(client).payg_toggle(True)
+
+
+class TestVasSetStatusBodies:
+    def test_activate_body(self, make_client):
+        client, rec = make_client()
+        rec.add("POST", "/set-status", json={"status": "success"})
+        OffersService(client).vas_activate(
+            {"service_id": "MCA", "charge_code": "CC1", "partner": "GP"}
+        )
+        assert json.loads(rec.requests[-1].content) == {
+            "serviceId": "MCA", "chargeCode": "CC1",
+            "partner": "GP", "action": "active",
+        }
+
+    def test_deactivate_falls_back_to_type(self, make_client):
+        client, rec = make_client()
+        rec.add("POST", "/set-status", json={"status": "success"})
+        OffersService(client).vas_deactivate({"type": "MCA"})
+        assert json.loads(rec.requests[-1].content)["serviceId"] == "MCA"
+        assert json.loads(rec.requests[-1].content)["action"] == "deactive"
+
+    def test_stop_all_sends_distinct_sorted_sets(self, make_client):
+        client, rec = make_client()
+        rec.add("POST", "/set-status", json={"status": "success"})
+        OffersService(client).vas_stop_all([
+            {"service_id": "B", "partner": "GP"},
+            {"service_id": "A", "partner": "GP"},
+            {"service_id": "A", "partner": ""},
+            {"type": "C"},
+        ])
+        body = json.loads(rec.requests[-1].content)
+        assert body["action"] == "deactive_all"
+        assert body["partners"] == ["GP"]
+        assert body["serviceIds"] == ["A", "B", "C"]

@@ -1,11 +1,13 @@
 """Usage history, bill cycles and autopay services."""
 
-from datetime import date
+from datetime import date, timedelta
 
+import pytest
 from constants import MSISDN_880, MSISDN_LOCAL
 
+from gpcli.errors import MyGPError
 from gpcli.models import UsageHistoryItem, UsageHistoryResponse
-from gpcli.services.autopay import local_msisdn
+from gpcli.services.autopay import AutoPayService, local_msisdn
 from gpcli.services.billing import _add_months, bill_cycles
 from gpcli.services.history import default_window
 
@@ -70,3 +72,93 @@ class TestLocalMsisdn:
         assert local_msisdn(MSISDN_880) == MSISDN_LOCAL
         assert local_msisdn(MSISDN_LOCAL) == MSISDN_LOCAL
         assert local_msisdn("+880 1700-000 000") == MSISDN_LOCAL
+
+
+_PRODUCTS = [
+    {"product_type": "low_balance", "product_code": "AP_LOW",
+     "frequency_unit": "day", "trigger_amount": "18"},
+    {"product_type": "scheduled_recharge", "product_code": "AP_SCHED",
+     "frequency_unit": "day", "frequency": ["1", "7", "30"]},
+]
+
+
+def _subscription_list(rec) -> None:
+    rec.add("GET", "/v1/auto-payment/subscription-list", json={
+        "data": {"setting": {"products": _PRODUCTS}, "subscription": []},
+    })
+
+
+class TestAutoPaySubscriptionBodies:
+    """`setup`/`update`/`cancel` wire contracts (money-adjacent)."""
+
+    def test_setup_low_balance_defaults(self, make_client, state):
+        import json as _json
+
+        client, rec = make_client()
+        _subscription_list(rec)
+        rec.add("POST", "/v1/auto-payment/pay", json={"status": "success"})
+        AutoPayService(client).setup(
+            amount="50", provisioning_msisdn=MSISDN_880,
+            service_provider="nagad", service_provider_identifier="tok",
+        )
+        body = _json.loads(rec.requests[-1].content)
+        assert body["product_type"] == "low_balance"
+        assert body["product_code"] == "AP_LOW"
+        assert body["frequency"] == ""  # low-balance mode: no frequency
+        assert body["provisioning_msisdn"] == MSISDN_LOCAL
+        assert body["service_provider"] == "nagad"
+        assert body["conn_type"] == "prepaid"
+        assert body["start_from"] == (date.today() + timedelta(days=1)).isoformat()
+
+    def test_setup_scheduled_uses_the_scheduled_product(self, make_client, state):
+        import json as _json
+
+        client, rec = make_client()
+        _subscription_list(rec)
+        rec.add("POST", "/v1/auto-payment/pay", json={"status": "success"})
+        AutoPayService(client).setup(
+            amount="50", provisioning_msisdn=MSISDN_880,
+            service_provider="nagad", service_provider_identifier="tok",
+            frequency="7", start_from=date(2026, 10, 1),
+        )
+        body = _json.loads(rec.requests[-1].content)
+        assert body["product_type"] == "scheduled_recharge"
+        assert body["product_code"] == "AP_SCHED"
+        assert body["frequency"] == "7"
+        assert body["start_from"] == "2026-10-01"
+
+    def test_setup_without_a_configured_product_raises(self, make_client, state):
+        client, rec = make_client()
+        rec.add("GET", "/v1/auto-payment/subscription-list", json={
+            "data": {"setting": {"products": []}, "subscription": []},
+        })
+        with pytest.raises(MyGPError, match="products"):
+            AutoPayService(client).setup(
+                amount="50", provisioning_msisdn=MSISDN_880,
+                service_provider="bkash", service_provider_identifier="tok",
+            )
+
+    def test_update_uses_the_put_endpoint(self, make_client, state):
+        import json as _json
+
+        client, rec = make_client()
+        _subscription_list(rec)
+        rec.add("PUT", "/v1/auto-payment/55/update", json={"status": "success"})
+        AutoPayService(client).update(
+            55, amount="100", provisioning_msisdn=MSISDN_880,
+            service_provider="bkash", service_provider_identifier="tok",
+            frequency="30",
+        )
+        body = _json.loads(rec.requests[-1].content)
+        assert body["amount"] == "100"
+        assert body["frequency"] == "30"
+        assert body["product_type"] == "scheduled_recharge"
+        assert "55/update" in str(rec.requests[-1].url)
+
+    def test_cancel_uses_delete_with_query_param(self, make_client, state):
+        client, rec = make_client()
+        rec.add("DELETE", "/v1/auto-payment/55/cancel", json={"status": "success"})
+        AutoPayService(client).cancel(55, MSISDN_880)
+        request = rec.requests[-1]
+        assert "55/cancel" in str(request.url)
+        assert request.url.params["provisioning_msisdn"] == MSISDN_LOCAL

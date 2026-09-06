@@ -4,6 +4,31 @@ All notable changes to this project are documented here. The format is
 based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.11.2] — 2026-09-06
+
+### Fixed
+- README hero example was four releases stale (a 4-row `gpcli me` panel and
+  the pre-1.10 version row) — regenerated from the real renderer with
+  synthetic data (full 11-row panel) and the version table refreshed.
+
+### Changed
+- Test strengthening driven by a coverage audit of the wire contracts:
+  - **auth service 20% → 93%** — new `test_auth_flows.py` (24 tests)
+    pins OTP staging/consumption, the verify body shape, msisdn
+    normalization fallbacks, the silent-login IP-gate error semantics,
+    the guest OAuth form post (client_credentials), forced/expiry token
+    re-minting, and logout's endpoint choice + survive-on-API-error
+    local clearing.
+  - autopay 42% → 76% — setup/update/cancel bodies (product selection
+    between low-balance and scheduled, `start_from` defaulting, the
+    DELETE+query-param cancel shape).
+  - offers 53% → 75% — PAYG toggle (campaign-activate with the
+    pay_go_on/pay_go_off pack, missing-pack error) and the VAS
+    set-status bodies (activate/deactivate/stop-all with distinct
+    sorted sets).
+- Removed `BUGS.md` — the audit findings live in the 1.11.1 entry.
+- 193 tests (+35), ruff + mypy clean.
+
 ## [1.11.1] — 2026-09-06
 
 ### Fixed
