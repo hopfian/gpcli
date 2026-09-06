@@ -14,7 +14,7 @@ import re
 from typing import Any
 
 from gpcli.client import ApiCaller, AuthMode
-from gpcli.errors import MyGPError
+from gpcli.errors import ApiError, MyGPError
 from gpcli.models import (
     FlexiBundlePrice,
     FlexiPlan,
@@ -224,7 +224,14 @@ class CatalogService:
         return data.get("data") or [] if isinstance(data, dict) else []
 
     def vas_history(self) -> list[dict[str, Any]]:
-        data = self.client.get_json("GET", VAS_HISTORY_ENDPOINT, auth_mode=AuthMode.SUBSCRIBER)
+        try:
+            data = self.client.get_json("GET", VAS_HISTORY_ENDPOINT, auth_mode=AuthMode.SUBSCRIBER)
+        except ApiError as err:
+            # the server signals "no transactions yet" as 400-DPDP-52025
+            # instead of an empty list — the app renders an empty state
+            if "52025" in str(err.code):
+                return []
+            raise
         return data.get("data") or [] if isinstance(data, dict) else []
 
 

@@ -4,6 +4,21 @@ All notable changes to this project are documented here. The format is
 based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.11.3] — 2026-09-06
+
+### Fixed
+- `gpcli vas history` errored on accounts without VAS transactions — the
+  server signals the empty state as `400-DPDP-52025` rather than an empty
+  list; it now renders "VAS history: none" (live-verified).
+
+### Changed
+- Release hygiene: annotated git tags exist for every release (v1.9.0 …)
+  and the CHANGELOG version links point at them; the README version row
+  is current again.
+- Pre-commit now mirrors the CI gates locally (ruff + mypy), so the hook
+  set and the pipeline can't drift apart.
+- 195 tests (+2: the VAS empty-state contract and error passthrough).
+
 ## [1.11.2] — 2026-09-06
 
 ### Fixed
@@ -244,6 +259,11 @@ price quoter, VAS, the pack catalog with Explore-tab categories, balance
 transfer with PIN management, and usage history. Detailed history was
 not recorded before 1.7.0.
 
+[1.11.3]: https://github.com/hopfian/gpcli/commits/v1.11.3
+[1.11.2]: https://github.com/hopfian/gpcli/commits/v1.11.2
+[1.11.1]: https://github.com/hopfian/gpcli/commits/v1.11.1
+[1.11.0]: https://github.com/hopfian/gpcli/commits/v1.11.0
+[1.10.1]: https://github.com/hopfian/gpcli/commits/v1.10.1
 [1.10.0]: https://github.com/hopfian/gpcli/commits/v1.10.0
 [1.9.0]: https://github.com/hopfian/gpcli/commits/v1.9.0
 [1.8.0]: https://github.com/hopfian/gpcli/commits/main

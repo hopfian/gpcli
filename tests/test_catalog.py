@@ -96,6 +96,24 @@ class TestNullDataHardening:
         rec.add("GET", "/vas/get-services", json={"data": None})
         assert CatalogService(client).vas_services(1) == []
 
+    def test_vas_history_empty_state_is_not_an_error(self, make_client):
+        """The server signals 'no transactions' as 400-DPDP-52025."""
+        client, rec = make_client()
+        rec.add("GET", "/vas/get-history",
+                json={"error": {"code": "400-DPDP-52025", "message": "no transactions"}})
+        assert CatalogService(client).vas_history() == []
+
+    def test_vas_history_other_errors_still_raise(self, make_client):
+        import pytest
+
+        from gpcli.errors import ApiError
+
+        client, rec = make_client()
+        rec.add("GET", "/vas/get-history",
+                json={"error": {"code": "500-OTHER", "message": "boom"}})
+        with pytest.raises(ApiError):
+            CatalogService(client).vas_history()
+
     def test_validity_summary_none_unit(self):
         pack = PackItem.model_validate({
             "pack_id": 1, "pack_name": "x", "price": 5,
