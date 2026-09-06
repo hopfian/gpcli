@@ -23,10 +23,13 @@ $ gpcli me
 | Test suite | 140 tests, ruff-clean |
 | Coverage | auth (3 flows) · account · catalog/flexiplan · purchase/recharge · transfer · bills · autopay · rewards · roaming · SIM/FnF/MCA/WT/netcare · partners · raw |
 
-> **Status note:** every read path is live-verified. The money paths
-> (`purchase pack`, `recharge pay`) are wired and confirmation-gated, with
-> body construction validated against production — but no money has moved
-> yet (see [Roadmap](#roadmap)).
+> **Status note:** every read path is live-verified, and the money paths are
+> verified with **real transactions** — single-use recharge via Nagad
+> (browser payment), bind/unbind/rebind cycles, one-tap purchases from a
+> bound wallet, and balance purchases (see the Purchase & recharge section
+> for the receipts). All money commands are confirmation-gated; the only
+> untested corner (plain wallet recharge without a pack) is tracked in the
+> [Roadmap](#roadmap).
 
 ## Contents
 
