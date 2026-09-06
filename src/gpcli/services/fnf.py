@@ -22,7 +22,7 @@ class FnfService:
     def __init__(self, client: ApiCaller):
         self.client = client
 
-    def list(self) -> FnfList:
+    def overview(self) -> FnfList:
         data = self.client.get_json("GET", FNF_LIST_ENDPOINT, auth_mode=AuthMode.SUBSCRIBER)
         return FnfList.model_validate(data)
 

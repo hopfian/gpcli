@@ -2,12 +2,15 @@
 
 import pytest
 
-from gpcli.models import FlexiPlan
+from gpcli.errors import MyGPError
+from gpcli.models import FlexiPlan, PackItem
 from gpcli.services.catalog import (
+    CatalogService,
     build_bundle_key,
     parse_bundle_price,
     quote_flexiplan,
 )
+from gpcli.services.netcare import NetworkComplainService
 
 CATALOG = FlexiPlan.model_validate({
     "hash": "abc",
@@ -73,9 +76,45 @@ class TestQuote:
         assert key == "L30_V300_D30G_F0M_B0M_S0"
         assert price.price_vat_mca_prepaid == 58.38
 
-    def test_missing_key_raises_keyerror(self):
-        with pytest.raises(KeyError, match="L99"):
+    def test_missing_key_raises_mygp_error(self):
+        from gpcli.errors import MyGPError
+
+        with pytest.raises(MyGPError, match="L99"):
             quote_flexiplan(CATALOG, 99)
+
+
+class TestNullDataHardening:
+    """`{"data": null}` must degrade to empty, never crash the comprehension."""
+
+    def test_vas_categories_null_data(self, make_client):
+        client, rec = make_client()
+        rec.add("GET", "/vas/get-categories", json={"data": None})
+        assert CatalogService(client).vas_categories() == []
+
+    def test_vas_services_null_data(self, make_client):
+        client, rec = make_client()
+        rec.add("GET", "/vas/get-services", json={"data": None})
+        assert CatalogService(client).vas_services(1) == []
+
+    def test_validity_summary_none_unit(self):
+        pack = PackItem.model_validate({
+            "pack_id": 1, "pack_name": "x", "price": 5,
+            "validity": {"value": "30", "unit": None},
+        })
+        assert pack.validity_summary() == "30"  # not "30 None"
+
+    def test_validity_summary_valueless_unit_only(self):
+        pack = PackItem.model_validate({
+            "pack_id": 1, "pack_name": "x", "price": 5,
+            "validity": {"value": None, "unit": "Days"},
+        })
+        assert pack.validity_summary() == "Days"  # a str, never None
+
+    def test_netcare_submit_missing_answer_key(self, make_client):
+        client, rec = make_client()
+        service = NetworkComplainService(client)
+        with pytest.raises(MyGPError, match="missing feedback"):
+            service.submit([{"id": 1, "type": "textarea"}])
 
 
 class TestFlexiPlanModel:

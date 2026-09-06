@@ -30,6 +30,7 @@ def certificate(
         console.print(f"[red]failed[/red] status={cert.status} (42901 = daily limit reached)")
         raise typer.Exit(1)
     if out:
+        out.parent.mkdir(parents=True, exist_ok=True)
         out.write_text(cert.data, encoding="utf-8")
         console.print(f"[green]saved[/green] {out} ({len(cert.data)} bytes)")
     else:

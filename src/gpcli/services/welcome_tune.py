@@ -29,7 +29,7 @@ class WelcomeTuneService:
     def status(self) -> dict:
         return self.client.get_json("GET", WT_STATUS_ENDPOINT, auth_mode=AuthMode.SUBSCRIBER)
 
-    def list(self) -> list[WelcomeTune]:
+    def tunes(self) -> list[WelcomeTune]:
         data = self.client.get_json("GET", WT_LIST_ENDPOINT, auth_mode=AuthMode.SUBSCRIBER)
         items = data if isinstance(data, list) else []
         return [WelcomeTune.model_validate(item) for item in items if isinstance(item, dict)]

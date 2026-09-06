@@ -8,6 +8,7 @@ Wire format (verified against the decompiled sources): ``GET common/v1/network-c
 from __future__ import annotations
 
 from gpcli.client import ApiCaller, AuthMode
+from gpcli.errors import MyGPError
 
 FEEDBACKS_ENDPOINT = "/common/v1/network-complain-feedbacks"
 FEEDBACK_ENDPOINT = "/common/v1/network-complain-feedbacks/{id}"
@@ -30,7 +31,14 @@ class NetworkComplainService:
         return self.client.get_json("GET", QUESTIONNAIRES_ENDPOINT, auth_mode=AuthMode.SUBSCRIBER)
 
     def submit(self, answers: list[dict], *, meta: dict | None = None) -> dict:
-        """`answers`: [{id, type, feedback}] — from `gpcli netcare questionnaires`."""
+        """`answers`: [{id, type, feedback}] - from `gpcli netcare questionnaires`."""
+        for index, answer in enumerate(answers):
+            missing = [k for k in ("id", "type", "feedback") if k not in answer]
+            if missing:
+                raise MyGPError(
+                    f"answer #{index + 1} is missing {', '.join(missing)} "
+                    "(see `gpcli netcare questionnaires`)"
+                )
         body: dict = {
             "questions": [
                 {"id": a["id"], "type": a["type"], "feedback": a["feedback"]}

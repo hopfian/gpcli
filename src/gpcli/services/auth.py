@@ -64,7 +64,7 @@ class AuthService:
 
     def verify_otp(self, otp: str, *, msisdn: str | None = None) -> Auth:
         """`POST v2/otp-login` — exchange the SMS code for tokens."""
-        normalized = msisdn or self.client.state.staged_msisdn
+        normalized = normalize_msisdn(msisdn) if msisdn else self.client.state.staged_msisdn
         if not normalized:
             raise AuthRequiredError("no OTP in flight — run `gpcli auth send-otp <msisdn>` first")
         state = self.client.state
@@ -189,8 +189,10 @@ class AuthService:
                 data = token_response.json()
             except httpx.HTTPError as err:
                 raise GuestFlowError(f"guest token request failed: {err}") from err
-            if err := error_from_payload(data):
-                raise GuestFlowError(f"guest token minting failed: [{err.code}] {err.summary()}")
+            if payload_error := error_from_payload(data):
+                raise GuestFlowError(
+                    f"guest token minting failed: [{payload_error.code}] {payload_error.summary()}"
+                )
             token = GuestTokenResponse.model_validate(data)
             if token.access_token == "":
                 raise GuestFlowError("guest token endpoint returned no accessToken")

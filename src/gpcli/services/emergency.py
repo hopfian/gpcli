@@ -23,6 +23,20 @@ BALANCE_ENDPOINT = "/balance"
 _OK_STATUSES = {"success", "pending"}
 
 
+def _num(value: object, default: float) -> float:
+    """Coerce wire numerics (float, int, or numeric string) to float."""
+    if isinstance(value, bool):  # bool is an int subclass — not a balance
+        return default
+    if isinstance(value, (int, float)):
+        return float(value)
+    if isinstance(value, str):
+        try:
+            return float(value.strip())
+        except ValueError:
+            return default
+    return default
+
+
 class EmergencyBalanceService:
     def __init__(self, client: ApiCaller):
         self.client = client
@@ -49,12 +63,17 @@ class EmergencyBalanceService:
 
     @staticmethod
     def eligibility(state: dict) -> dict:
-        """App rules: prepaid, main balance under threshold, no active loan."""
-        main_balance = state.get("balance", 0) or 0
+        """App rules: prepaid, main balance under threshold, no active loan.
+
+        The wire format is inconsistent — ``balance`` arrives as a number but
+        ``settings.eb_eligibility_balance`` as a *string* — so both go through
+        a tolerant numeric coercion before comparing.
+        """
+        main_balance = _num(state.get("balance"), 0.0)
         eb = state.get("emergency_balance") or {}
         settings = state.get("settings") or {}
-        threshold = settings.get("eb_eligibility_balance", 18)
-        active_loan = (eb.get("total") or 0) > 0
+        threshold = _num(settings.get("eb_eligibility_balance"), 18.0)
+        active_loan = _num(eb.get("total"), 0.0) > 0
         return {
             "main_balance": main_balance,
             "threshold": threshold,

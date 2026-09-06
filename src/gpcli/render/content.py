@@ -10,8 +10,8 @@ from gpcli.render.base import console, plural
 
 
 def render_cards(data: dict) -> None:
-    cards = data.get("cards", {})
-    categories = data.get("categories", {})
+    cards = data.get("cards") or {}
+    categories = data.get("categories") or {}
     table = Table(box=box.SIMPLE_HEAVY, title=f"Cards engine — {plural(len(cards), 'card')}")
     table.add_column("card id", style="cyan")
     table.add_column("type")

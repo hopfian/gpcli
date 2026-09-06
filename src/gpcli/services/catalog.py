@@ -14,6 +14,7 @@ import re
 from typing import Any
 
 from gpcli.client import ApiCaller, AuthMode
+from gpcli.errors import MyGPError
 from gpcli.models import (
     FlexiBundlePrice,
     FlexiPlan,
@@ -144,12 +145,12 @@ def quote_flexiplan(
     bioscope_mb: int = 0,
     sms: int = 0,
 ) -> tuple[str, FlexiBundlePrice]:
-    """Look up the price for a bundle combination. Raises KeyError if absent."""
+    """Look up the price for a bundle combination. Raises MyGPError if absent."""
     key = build_bundle_key(days, voice, data_mb, data4g_mb, bioscope_mb, sms)
     try:
         raw = catalog.bundles[key]
     except KeyError as err:
-        raise KeyError(f"no bundle priced for {key}") from err
+        raise MyGPError(f"no bundle priced for {key}") from err
     return key, parse_bundle_price(raw)
 
 
@@ -207,7 +208,7 @@ class CatalogService:
 
     def vas_categories(self) -> list[VasCategory]:
         data = self.client.get_json("GET", VAS_CATEGORIES_ENDPOINT, auth_mode=AuthMode.SUBSCRIBER)
-        return [VasCategory.model_validate(item) for item in data.get("data", [])]
+        return [VasCategory.model_validate(item) for item in data.get("data") or []]
 
     def vas_services(self, category_id: int) -> list[VasService]:
         data = self.client.get_json(
@@ -215,16 +216,16 @@ class CatalogService:
             params={"categoryId": category_id},
             auth_mode=AuthMode.SUBSCRIBER,
         )
-        return [VasService.model_validate(item) for item in data.get("data", [])]
+        return [VasService.model_validate(item) for item in data.get("data") or []]
 
     def vas_subscriptions(self) -> list[dict[str, Any]]:
         """Active VAS subscriptions (raw items — shape varies by type)."""
         data = self.client.get_json("GET", VAS_SUBSCRIPTIONS_ENDPOINT, auth_mode=AuthMode.SUBSCRIBER)
-        return data.get("data", []) if isinstance(data, dict) else []
+        return data.get("data") or [] if isinstance(data, dict) else []
 
     def vas_history(self) -> list[dict[str, Any]]:
         data = self.client.get_json("GET", VAS_HISTORY_ENDPOINT, auth_mode=AuthMode.SUBSCRIBER)
-        return data.get("data", []) if isinstance(data, dict) else []
+        return data.get("data") or [] if isinstance(data, dict) else []
 
 
 def _sort_packs(packs: list[PackItem]) -> list[PackItem]:

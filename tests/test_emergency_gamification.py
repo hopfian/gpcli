@@ -44,8 +44,40 @@ class TestEmergencyBalanceModels:
         state["balance"] = 50
         assert EmergencyBalanceService.eligibility(state)["eligible"] is False
 
+    def test_eligibility_tolerates_string_numerics(self):
+        """The wire format is inconsistent: threshold arrives as a string,
+        and some accounts send balance as a numeric string too."""
+        info = EmergencyBalanceService.eligibility({
+            "balance": "5.50",
+            "emergency_balance": {"total": "0", "due": "0"},
+            "settings": {"eb_eligibility_balance": "18"},
+        })
+        assert info["main_balance"] == 5.5
+        assert info["threshold"] == 18.0
+        assert info["eligible"] is True
+        # unparseable values fall back to the defaults, not to a crash
+        junk = EmergencyBalanceService.eligibility({"balance": None})
+        assert junk["main_balance"] == 0.0
+        assert junk["threshold"] == 18.0
+
 
 class TestStreakModels:
+    def test_reward_lives_in_settings_not_runtime(self):
+        """Runtime milestone[] entries carry id/status only — the reward
+        amounts only exist in settings.milestones (live-verified shape)."""
+        info = DailyLoginStreakInfo.model_validate({
+            "current_streak": 5,
+            "milestone": [{"id": 1, "status": 2}],  # claimable, no reward field
+            "settings": {
+                "total_streak": 30,
+                "milestones": [{"id": 1, "status": 0, "milestone_days": 7, "milestone_reward": 100}],
+            },
+        })
+        assert info.milestone[0].milestone_reward is None  # the trap
+        assert info.reward_for(1) == 100  # resolved from settings
+        assert info.reward_for(99) == 0  # unknown id
+        assert info.reward_for(None) == 0
+
     def test_streak_parse_with_claimable(self):
         info = DailyLoginStreakInfo.model_validate({
             "current_streak": 5,

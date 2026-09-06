@@ -91,13 +91,14 @@ def purchase_pack(
         console.print_json(data=response.model_dump(exclude_none=True))
         return
 
+    data = response.data
     if response.action_required:
         console.print("[yellow]action required[/yellow] — complete payment at:")
-        console.print(response.data.payment_url)
+        console.print(data.payment_url if data else "-")
         return
-    if response.ok:
-        direct = response.data.direct_recharge
-        rows = [("status", response.data.status)]
+    if response.ok and data:
+        direct = data.direct_recharge
+        rows = [("status", data.status)]
         if direct:
             rows += [
                 ("transaction", direct.recharge_transaction_id or "-"),
@@ -106,7 +107,7 @@ def purchase_pack(
             ]
         console.print(_fmt_panel_grid("Purchase successful", rows, border_style="green"))
         return
-    console.print(f"[red]purchase failed[/red] status={response.data.status if response.data else 'none'}")
+    console.print(f"[red]purchase failed[/red] status={data.status if data else 'none'}")
     raise typer.Exit(1)
 
 

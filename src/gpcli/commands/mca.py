@@ -51,7 +51,8 @@ def _mca_set(enabled: bool, yes: bool) -> None:
         console.print_json(data=result)
         return
     pending = str(result.get("status", "")).lower() == "pending"
-    console.print(
-        "[green]accepted (pending)[/green]"
-        if pending else f"[red]failed[/red] {result.get('message', result)}"
-    )
+    if pending:
+        console.print("[green]accepted (pending)[/green]")
+        return
+    console.print(f"[red]failed[/red] {result.get('message', result)}")
+    raise typer.Exit(1)

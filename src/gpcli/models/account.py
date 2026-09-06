@@ -28,6 +28,7 @@ class Profile(BaseModel):
     source: str = ""
     created_at: str = ""
     updated_at: str = ""
+    rfu_1: str = ""  # "reserved for use" #1 — the server stores interests here
 
 
 class Me(BaseModel):

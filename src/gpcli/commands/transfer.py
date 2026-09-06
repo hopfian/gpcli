@@ -99,18 +99,22 @@ def reset_pin(
         if not msisdn:
             raise typer.BadParameter("no session msisdn; pass --msisdn")
 
+    # In --json mode the whole flow emits ONE object: {initiate, verify, set}
+    # (with the failing step last), so stdout stays a valid single-JSON stream.
+    out: dict = {}
+
     with ctx.client() as client:
         service = TransferService(client)
         # 1. initiate — dispatches an OTP SMS and returns a reference_id
         initiate = service.reset_pin_initiate()
-        if ctx.json_out:
-            console.print_json(data={"initiate": initiate})
+        out["initiate"] = initiate
         data = initiate.get("data") or {}
         reference_id = data.get("reference_id") if isinstance(data, dict) else None
         if not reference_id:
             if ctx.json_out:
-                return
-            console.print(f"[red]initiate failed[/red] {initiate}")
+                console.print_json(data=out)
+            else:
+                console.print(f"[red]initiate failed[/red] {initiate}")
             raise typer.Exit(1)
 
         if not otp:
@@ -118,8 +122,7 @@ def reset_pin(
 
         # 2. verify
         verify = service.reset_pin_verify(str(reference_id), otp, msisdn)
-        if ctx.json_out:
-            console.print_json(data={"verify": verify})
+        out["verify"] = verify
         verified = (
             (verify.get("data") or {}).get("is_otp_verified") in (True, "true", "1", 1)
             if isinstance(verify.get("data"), dict)
@@ -127,8 +130,9 @@ def reset_pin(
         )
         if not verified:
             if ctx.json_out:
-                return
-            console.print(f"[red]OTP verification failed[/red] {verify}")
+                console.print_json(data=out)
+            else:
+                console.print(f"[red]OTP verification failed[/red] {verify}")
             raise typer.Exit(1)
 
         # 3. set the new PIN
@@ -139,9 +143,10 @@ def reset_pin(
                 console.print("[red]PINs do not match[/red]")
                 raise typer.Exit(1)
         result = service.reset_pin_set(new_pin, new_pin)
+        out["set"] = result
 
     if ctx.json_out:
-        console.print_json(data={"set": result})
+        console.print_json(data=out)
         return
     status = result.get("result", "")
     message = result.get("message", "") or result

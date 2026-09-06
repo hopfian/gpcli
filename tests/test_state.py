@@ -84,3 +84,14 @@ def test_guest_expiry_math():
     assert not g.token_expired(now)
     assert g.token_expired(now + 1000)
     assert GuestSession(user_id="1", client_id="c", client_secret="s").token_expired(now)
+
+
+def test_guest_expiry_returns_bool_in_all_branches():
+    """`expires_at == 0` (unknown expiry) must yield a real False, not the
+    int `0` it used to leak through a short-circuit."""
+    now = int(time.time())
+    g = GuestSession(user_id="1", client_id="c", client_secret="s",
+                     access_token="t", issued_at=now - 4000, expires_at=0)
+    result = g.token_expired(now)
+    assert result is False and isinstance(result, bool)
+    assert isinstance(g.token_expired(now), bool)

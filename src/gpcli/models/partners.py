@@ -26,3 +26,5 @@ class PartnerToken(BaseModel):
 
     token: str = ""
     token_info: dict[str, Any] = Field(default_factory=dict)
+    url: str = ""  # win/deen: partner redirect URL
+    type: str = ""

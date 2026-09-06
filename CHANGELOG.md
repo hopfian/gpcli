@@ -4,6 +4,52 @@ All notable changes to this project are documented here. The format is
 based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.11.1] — 2026-09-06
+
+### Fixed
+- **`gpcli eb status` crashed on the live API** (TypeError in the
+  eligibility comparison): the threshold arrives as a *string* — all wire
+  numerics now go through tolerant coercion. Live-verified post-fix.
+- `gpcli me` crashed (`AttributeError`) whenever the profile payload lacked
+  `rfu_1` (interests) — the field is now declared on `Profile`.
+- `streak claim` prompted to claim "0 GP points": runtime `milestone[]`
+  entries carry no reward (live-verified — amounts only exist in
+  `settings.milestones`); rewards now resolve via `reward_for()` and
+  id-less milestones are rejected.
+- `PackItem.validity_summary()` could return `None` (crashing `packs`) or
+  format `"30 None"` on unit-less validities.
+- `vas categories/services` and `content cards`/`news` crashed on
+  `{"data": null}`-style payloads — null fields now degrade to empty.
+- Service-layer `RuntimeError`/`KeyError` bypassed the `MyGPError`
+  boundary and dumped raw tracebacks (PAYG toggle, flexiplan quote,
+  netcare submit answers) — all flow through the boundary now.
+- `raw call` printed an HTTP status line under `--json`, corrupting the
+  stream; `mca on/off` failures exited 0; `transfer reset-pin` emitted
+  three separate JSON objects (now one accumulated object) and exited 0
+  on mid-flow failures.
+- `history` silently dropped a lone `--start`/`--end` (now a parameter
+  error); `sim certificate --out` crashed on nested output paths (parents
+  are created); `autopay setup --frequency 1` printed "1 days" (string
+  count pluralized — coerced and validated numeric).
+- `AuthService.verify_otp()` didn't normalize the msisdn while
+  `send_otp()` did — both accept the same formats now.
+
+### Changed
+- Renamed the `list()` service methods (`AutoPayService.subscriptions()`,
+  `WelcomeTuneService.tunes()`, `FnfService.overview()`) — a `list`
+  method in class scope shadows the builtin for every later annotation.
+- `ContentService` now requires the concrete `MyGPClient` it actually
+  needs (guest minting via `raw_post`), instead of the `ApiCaller`
+  protocol; `PartnerToken.url`/`.type` declared; `GuestSession.
+  token_expired()` returns a real `bool` in every branch.
+
+### Added
+- **mypy gate**: the codebase is fully type-checked (77 files, zero
+  errors — including the `list`-shadowing and `token_expired` findings)
+  and CI now enforces it alongside ruff. 158 tests (11 new: string
+  numerics, null-data hardening, `reward_for`, `rfu_1` presence/absence,
+  bool-branch expiry).
+
 ## [1.11.0] — 2026-09-06
 
 ### Changed

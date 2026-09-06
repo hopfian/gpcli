@@ -18,6 +18,20 @@ jobs:
       - name: Lint
         run: ruff check src tests
 
+  typecheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Install
+        run: |
+          pip install -e .
+          pip install "mypy>=1.14" pydantic
+      - name: Type-check
+        run: mypy src/gpcli
+
   test:
     runs-on: ${{ matrix.os }}
     strategy:

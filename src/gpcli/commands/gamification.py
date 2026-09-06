@@ -47,7 +47,7 @@ def status() -> None:
     table.add_column("reward", justify="right", style="green")
     table.add_column("status")
     for milestone in info.milestone:
-        cfg = config.get(milestone.id)
+        cfg = config.get(milestone.id) if milestone.id is not None else None
         table.add_row(
             str(milestone.id if milestone.id is not None else "-"),
             str(cfg.milestone_days if cfg and cfg.milestone_days else "-"),
@@ -75,20 +75,24 @@ def claim(
             if not claimable:
                 console.print("[dim]nothing claimable today[/dim]")
                 raise typer.Exit(1)
-            milestone_id = claimable[0].id
             target = claimable[0]
+            milestone_id = target.id if target.id is not None else 0
+            if milestone_id == 0:
+                console.print("[red]claimable milestone has no id[/red]")
+                raise typer.Exit(1)
         else:
-            target = next((m for m in info.milestone if m.id == milestone_id), None)
-            if target is None:
+            found = next((m for m in info.milestone if m.id == milestone_id), None)
+            if found is None:
                 raise typer.BadParameter(f"milestone {milestone_id} not found")
-            if target.status != 2:
+            if found.status != 2:
                 console.print(
                     f"[red]milestone {milestone_id} is not claimable "
-                    f"({target.status_label})[/red]"
+                    f"({found.status_label})[/red]"
                 )
                 raise typer.Exit(1)
+            target = found
 
-        reward = target.milestone_reward or 0
+        reward = info.reward_for(milestone_id)
         label = plural(reward, "GP point")
         if not yes and not typer.confirm(f"Claim {label} (milestone {milestone_id})?"):
             console.print("[dim]aborted[/dim]")

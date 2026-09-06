@@ -50,6 +50,14 @@ class DailyLoginStreakInfo(BaseModel):
     def claimable(self) -> list[StreakMilestone]:
         return [m for m in self.milestone if m.status == 2]
 
+    def reward_for(self, milestone_id: int | None) -> int:
+        """Reward for a runtime milestone — the server only sends amounts in
+        `settings.milestones` (runtime `milestone[]` entries carry id/status only)."""
+        for config in (self.settings.milestones if self.settings else []):
+            if config.id == milestone_id and config.milestone_reward:
+                return config.milestone_reward
+        return 0
+
 
 class ClaimResult(BaseModel):
     """`POST /v2/gamification/daily-login/claim` — `PostResult`."""

@@ -81,3 +81,13 @@ select = ["E", "F", "I", "UP", "B", "SIM"]
 
 [tool.ruff.lint.flake8-bugbear]
 extend-immutable-calls = ["typer.Option", "typer.Argument"]
+
+[tool.mypy]
+# src-layout, py.typed shipped — keep the contract machine-checked in CI.
+mypy_path = "src"
+packages = ["gpcli"]
+python_version = "3.10"
+warn_unused_ignores = true
+warn_redundant_casts = true
+no_implicit_optional = true
+check_untyped_defs = true

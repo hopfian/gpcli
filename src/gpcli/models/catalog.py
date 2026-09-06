@@ -175,8 +175,8 @@ class PackItem(BaseModel):
         if not validity:
             return ""
         if validity.value:
-            return f"{validity.value} {validity.unit}".strip()
-        return validity.unit
+            return f"{validity.value} {validity.unit or ''}".strip()
+        return validity.unit or ""
 
 
 class CmpOffer(BaseModel):

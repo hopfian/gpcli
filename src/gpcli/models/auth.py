@@ -76,4 +76,7 @@ class GuestSession(BaseModel):
     expires_at: int = 0  # issued_at + expiresIn
 
     def token_expired(self, now: int, skew: int = 60) -> bool:
-        return not self.access_token or (self.expires_at and now > self.expires_at - skew)
+        return bool(
+            not self.access_token
+            or (self.expires_at and now > self.expires_at - skew)
+        )

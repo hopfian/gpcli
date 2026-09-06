@@ -31,6 +31,7 @@ def status() -> None:
         return
 
     from gpcli.render import _fmt_panel_grid  # local helper
+    from gpcli.services.emergency import _num
 
     rows: list[tuple[str, str]] = [
         ("eligible amount", f"{eb.value:g} BDT"),
@@ -40,12 +41,12 @@ def status() -> None:
         info = EmergencyBalanceService.eligibility(state)
         nested = state.get("emergency_balance") or {}
         rows.append(("main balance", f"{info['main_balance']:g} BDT"))
-        rows.append(("eligibility threshold", f"< {info['threshold']} BDT"))
+        rows.append(("eligibility threshold", f"< {info['threshold']:g} BDT"))
         if info["active_loan"]:
-            rows.append(("active loan total", f"{nested.get('total', 0):g} BDT"))
-            rows.append(("due", f"{nested.get('due', 0):g} BDT"))
+            rows.append(("active loan total", f"{_num(nested.get('total'), 0):g} BDT"))
+            rows.append(("due", f"{_num(nested.get('due'), 0):g} BDT"))
             rows.append(("remaining", str(nested.get("remaining", "")) or "-"))
-            rows.append(("data loan", f"{nested.get('data_loan', 0):g} BDT"))
+            rows.append(("data loan", f"{_num(nested.get('data_loan'), 0):g} BDT"))
         rows.append(("eligible now", "yes" if info["eligible"] else "no"))
     console.print(_fmt_panel_grid("Emergency balance", rows))
 

@@ -10,7 +10,7 @@ from __future__ import annotations
 import time
 from typing import Any
 
-from gpcli.client import ApiCaller, AuthMode
+from gpcli.client import AuthMode, MyGPClient
 from gpcli.constants import (
     CARDS_URL,
     DISTRICTS_URL,
@@ -21,7 +21,9 @@ from gpcli.services.auth import AuthService
 
 
 class ContentService:
-    def __init__(self, client: ApiCaller, auth_service: AuthService | None = None):
+    def __init__(self, client: MyGPClient, auth_service: AuthService | None = None):
+        # MyGPClient (not the ApiCaller protocol): guest minting goes through
+        # AuthService, which needs raw_post for the OAuth token endpoint.
         self.client = client
         self._auth = auth_service or AuthService(client)
 

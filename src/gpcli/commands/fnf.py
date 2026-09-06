@@ -18,7 +18,7 @@ def fnf_list() -> None:
     """List FnF numbers with quota info."""
     ctx = get_context()
     with ctx.client() as client:
-        result = FnfService(client).list()
+        result = FnfService(client).overview()
     if ctx.json_out:
         console.print_json(data=result.model_dump())
         return

@@ -26,6 +26,8 @@ def history(
 ) -> None:
     """Fetch CDR records: calls, data, SMS, recharges, packs, balance transfers."""
     ctx = get_context()
+    if bool(start) != bool(end):
+        raise typer.BadParameter("--start and --end must be used together")
     window = (
         (date.fromisoformat(start), date.fromisoformat(end))
         if start and end

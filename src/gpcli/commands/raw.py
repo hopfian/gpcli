@@ -54,7 +54,8 @@ def call(
             method, path, base=base, json_body=json_body, auth_mode=auth_mode
         )
 
-    console.print(f"[dim]{response.status_code} {response.reason_phrase}[/dim]")
+    if not ctx.json_out:
+        console.print(f"[dim]{response.status_code} {response.reason_phrase}[/dim]")
     try:
         console.print_json(data=response.json())
     except (ValueError, MyGPError):

@@ -29,7 +29,7 @@ def list_subscriptions() -> None:
     """List autopay subscriptions and settings (GET subscription-list)."""
     ctx = get_context()
     with get_context().client() as client:
-        response = AutoPayService(client).list()
+        response = AutoPayService(client).subscriptions()
     if ctx.json_out:
         console.print_json(data=response.model_dump(exclude_none=True))
         return
@@ -113,8 +113,10 @@ def setup(
         raise typer.BadParameter(
             "--provider and --identifier are required (discover values via `gpcli autopay methods`)"
         )
+    if frequency and not frequency.isdigit():
+        raise typer.BadParameter("--frequency must be a whole number of days")
     start_date = date.fromisoformat(start_from) if start_from else None
-    mode = f"scheduled every {plural(frequency, 'day')}" if frequency else "on low balance"
+    mode = f"scheduled every {plural(int(frequency), 'day')}" if frequency else "on low balance"
     when = start_date or "tomorrow"
     if not yes and not typer.confirm(
         f"Set up autopay: {amount} BDT -> {msisdn} ({mode}, starting {when})?"
@@ -153,7 +155,7 @@ def cancel(
     with get_context().client() as client:
         service = AutoPayService(client)
         if not msisdn:
-            for sub in service.list().subscription:
+            for sub in service.subscriptions().subscription:
                 if sub.id == subscription_id:
                     msisdn = sub.msisdn
         if not msisdn:
@@ -187,14 +189,14 @@ def update(
         service = AutoPayService(client)
         sub_msisdn = msisdn
         if not sub_msisdn:
-            for sub in service.list().subscription:
+            for sub in service.subscriptions().subscription:
                 if sub.id == subscription_id:
                     sub_msisdn = sub.msisdn
                     break
         if not sub_msisdn:
             raise typer.BadParameter("could not resolve the provisioning number — pass --msisdn")
         if not provider or not identifier:
-            for sub in service.list().subscription:
+            for sub in service.subscriptions().subscription:
                 if sub.id == subscription_id:
                     provider = provider or sub.service_provider
                     identifier = identifier or sub.service_provider_identifier

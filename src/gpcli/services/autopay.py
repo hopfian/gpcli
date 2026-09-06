@@ -57,7 +57,7 @@ class AutoPayService:
     def __init__(self, client: ApiCaller):
         self.client = client
 
-    def list(self, connection_type: str = "prepaid") -> AutoPayListResponse:
+    def subscriptions(self, connection_type: str = "prepaid") -> AutoPayListResponse:
         data = self.client.get_json(
             "GET", SUBSCRIPTION_LIST_ENDPOINT,
             params={"connection_type": connection_type},
@@ -66,7 +66,7 @@ class AutoPayService:
         return AutoPayListResponse.model_validate(_unwrap(data) or {})
 
     def products(self, connection_type: str = "prepaid") -> list[AutoPayProduct]:
-        return self.list(connection_type).products
+        return self.subscriptions(connection_type).products
 
     def product(self, product_type: str, connection_type: str = "prepaid") -> AutoPayProduct | None:
         for product in self.products(connection_type):

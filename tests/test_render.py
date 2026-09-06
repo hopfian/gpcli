@@ -1,5 +1,6 @@
 """Render primitives — shared formatting helpers."""
 
+from gpcli.models import Me, Profile
 from gpcli.render import action_ok, plural, render_action_response
 
 
@@ -14,6 +15,38 @@ def test_plural_plural():
     assert plural(2, "day") == "2 days"
     assert plural(56, "day") == "56 days"
     assert plural(120, "GP point") == "120 GP points"
+
+
+class TestRenderMe:
+    """`render_me` must survive payloads with and without the interests field."""
+
+    def test_profile_without_rfu_1_does_not_crash(self, capsys):
+        from gpcli.render.account import render_me
+
+        me = Me(msisdn="8801700000000", profile=Profile(name="X"))
+        render_me(me)  # used to raise AttributeError on rfu_1
+        out = capsys.readouterr().out
+        assert "interests" not in out  # row only shows when present
+
+    def test_profile_with_rfu_1_shows_interests(self, capsys):
+        from gpcli.render.account import render_me
+
+        me = Me(
+            msisdn="8801700000000",
+            profile=Profile(name="X", rfu_1="sports,music"),
+        )
+        render_me(me)
+        out = capsys.readouterr().out
+        assert "interests" in out and "sports,music" in out
+
+
+class TestRenderCardsNull:
+    def test_null_cards_renders_empty(self, capsys):
+        from gpcli.render.content import render_cards
+
+        render_cards({"cards": None, "categories": None})  # no crash
+        out = capsys.readouterr().out
+        assert "0 cards" in out
 
 
 class TestActionOk:

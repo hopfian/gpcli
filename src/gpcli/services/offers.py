@@ -18,6 +18,7 @@ from __future__ import annotations
 
 from gpcli.bodies import campaign_activate_body
 from gpcli.client import ApiCaller, AuthMode
+from gpcli.errors import MyGPError
 from gpcli.models import BalanceStatusItem, GAOfferInfo, PackItem, ReceiverGift
 from gpcli.services.catalog import CatalogService
 
@@ -80,7 +81,7 @@ class OffersService:
         pack = on_pack if enable else off_pack
         if pack is None:
             direction = "pay_go_on" if enable else "pay_go_off"
-            raise RuntimeError(f"no {direction} pack in the catalog — PAYG toggle unavailable")
+            raise MyGPError(f"no {direction} pack in the catalog — PAYG toggle unavailable")
         msisdn = self.client.state.auth.msisdn if self.client.state.auth else "0"
         return self.client.get_json(
             "POST", CAMPAIGN_ACTIVATE_ENDPOINT,

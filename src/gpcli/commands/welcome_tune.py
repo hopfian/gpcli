@@ -57,7 +57,7 @@ def wt_list() -> None:
     """My tunes (GET wt/list)."""
     ctx = get_context()
     with ctx.client() as client:
-        result = WelcomeTuneService(client).list()
+        result = WelcomeTuneService(client).tunes()
     if ctx.json_out:
         console.print_json(data=[t.model_dump(exclude_none=True) for t in result])
         return
