@@ -6,13 +6,13 @@ from rich import box
 from rich.panel import Panel
 from rich.table import Table
 
-from gpcli.render.base import console
+from gpcli.render.base import console, plural
 
 
 def render_cards(data: dict) -> None:
     cards = data.get("cards", {})
     categories = data.get("categories", {})
-    table = Table(box=box.SIMPLE_HEAVY, title=f"Cards engine — {len(cards)} cards")
+    table = Table(box=box.SIMPLE_HEAVY, title=f"Cards engine — {plural(len(cards), 'card')}")
     table.add_column("card id", style="cyan")
     table.add_column("type")
     table.add_column("home", justify="center")
@@ -57,9 +57,9 @@ def render_news(data: dict) -> None:
                     str(item.get("pubDate", ""))[:16],
                 ))
     if not rows:
-        console.print_json(data=data)
+        console.print("[dim]no news[/dim]")
         return
-    table = Table(box=box.SIMPLE_HEAVY, title=f"News — {len(rows)} items")
+    table = Table(box=box.SIMPLE_HEAVY, title=f"News — {plural(len(rows), 'item')}")
     table.add_column("title")
     table.add_column("source", style="dim")
     table.add_column("published", style="dim")

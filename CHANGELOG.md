@@ -4,6 +4,20 @@ All notable changes to this project are documented here. The format is
 based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.10.1] — 2026-09-06
+
+### Fixed
+- Human-mode output leaked raw JSON in three commands — `recharge numbers`
+  (now a table with a "you" marker for your own number, matched in national
+  format), `offers gift-cards` (now a table of themes with the total count),
+  and `content news` on an empty feed (now a friendly message).
+- `recharge history` discarded the server's window hint — it now shows
+  "Showing history for last 30 days", and the command is documented for
+  what it is: **bill payments** (postpaid accounts; empty for prepaid).
+- Grammar: every count/word pair is now pluralized (`1 day`, `56 days`,
+  `every N days`, `N GP points`, `N cards`, `N items`) via a new `plural()`
+  primitive in the render facade (pinned by tests).
+
 ## [1.10.0] — 2026-09-06
 
 ### Added

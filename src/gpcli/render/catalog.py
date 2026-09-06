@@ -6,7 +6,7 @@ from rich import box
 from rich.panel import Panel
 from rich.table import Table
 
-from gpcli.render.base import _fmt_mb, console
+from gpcli.render.base import _fmt_mb, console, plural
 
 
 def _decode_bundle_key(key: str) -> tuple[int, int, int, int, int, int]:
@@ -67,7 +67,7 @@ def render_flexiplan_quote(key: str, price, mca: bool = False) -> None:
     combo.add_column(style="dim", justify="right")
     combo.add_column()
     combo.add_row("bundle key", key)
-    combo.add_row("validity", f"{days} days")
+    combo.add_row("validity", plural(days, "day"))
     combo.add_row("voice", f"{voice} min")
     if data:
         combo.add_row("data", _fmt_mb(data))

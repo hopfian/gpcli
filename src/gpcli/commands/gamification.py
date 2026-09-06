@@ -5,7 +5,7 @@ from __future__ import annotations
 import typer
 
 from gpcli.context import get_context
-from gpcli.render import console
+from gpcli.render import console, plural
 from gpcli.services.gamification import GamificationService
 
 app = typer.Typer(help="Daily-login streak rewards and GP points")
@@ -29,8 +29,8 @@ def status() -> None:
 
     total = info.settings.total_streak if info.settings else None
     rows = [
-        ("current streak", f"{info.current_streak} days"),
-        ("total streak", f"{total} days" if total else "-"),
+        ("current streak", plural(info.current_streak, "day")),
+        ("total streak", plural(total, "day") if total else "-"),
         ("claimable now", str(len(info.claimable)) if info.claimable else "none"),
     ]
     if info.settings and info.settings.gamification_header:
@@ -89,7 +89,8 @@ def claim(
                 raise typer.Exit(1)
 
         reward = target.milestone_reward or 0
-        if not yes and not typer.confirm(f"Claim {reward} GP points (milestone {milestone_id})?"):
+        label = plural(reward, "GP point")
+        if not yes and not typer.confirm(f"Claim {label} (milestone {milestone_id})?"):
             console.print("[dim]aborted[/dim]")
             raise typer.Exit(1)
         result = service.claim(milestone_id)

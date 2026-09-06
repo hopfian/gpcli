@@ -9,6 +9,7 @@ from rich import box
 from rich.table import Table
 
 from gpcli.context import get_context
+from gpcli.msisdn import local_msisdn
 from gpcli.render import _fmt_panel_grid, console
 from gpcli.services.autopay import AutoPayService
 from gpcli.services.purchase import PurchaseService
@@ -135,17 +136,20 @@ def offers() -> None:
 
 @recharge_app.command()
 def history() -> None:
-    """Payment history (GET orders/v1/bill-payments)."""
+    """Bill payment history (GET orders/v1/bill-payments — postpaid; empty for prepaid)."""
     ctx = get_context()
     with ctx.client() as client:
         result = PurchaseService(client).payment_history()
     if ctx.json_out:
         console.print_json(data=result.model_dump())
         return
+    hint = result.settings.get("duration_title", "") if result.settings else ""
     if not result.result:
-        console.print("[dim]no payment history[/dim]")
+        console.print(f"[dim]no bill payments[/dim]{f' — {hint}' if hint else ''}")
         return
-    table = Table(box=box.SIMPLE_HEAVY, title=f"Payment history ({len(result.result)})")
+    table = Table(box=box.SIMPLE_HEAVY, title=f"Bill payments ({len(result.result)})")
+    if hint:
+        table.caption = hint
     table.add_column("id", justify="right", style="cyan")
     table.add_column("type")
     table.add_column("amount", justify="right")
@@ -161,11 +165,25 @@ def history() -> None:
 
 @recharge_app.command()
 def numbers() -> None:
-    """Recently recharged numbers."""
+    """Recently recharged numbers (AutoPay history)."""
     ctx = get_context()
     with ctx.client() as client:
         result = AutoPayService(client).recent_numbers()
-    console.print_json(data=result)
+    if ctx.json_out:
+        console.print_json(data=result)
+        return
+    if not result:
+        console.print("[dim]no recently recharged numbers[/dim]")
+        return
+    own = ctx.state.auth.msisdn if ctx.state.auth else None
+    table = Table(box=box.SIMPLE_HEAVY, title=f"Recently recharged ({len(result)})")
+    table.add_column("msisdn", style="cyan")
+    table.add_column("note", style="dim")
+    for msisdn in result:
+        # auth stores international format, the list is national — compare locally
+        is_you = own is not None and local_msisdn(msisdn) == local_msisdn(own)
+        table.add_row(msisdn, "you" if is_you else "")
+    console.print(table)
 
 
 @recharge_app.command()

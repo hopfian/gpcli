@@ -44,7 +44,30 @@ def gift_cards(
     ctx = get_context()
     with ctx.client() as client:
         result = OffersService(client).gift_cards(offset, limit)
-    console.print_json(data=result)
+    if ctx.json_out:
+        console.print_json(data=result)
+        return
+    data = result.get("data") or {}
+    content = data.get("content") or []
+    if not content:
+        console.print("[dim]no gift card themes[/dim]")
+        return
+    meta = data.get("meta") or {}
+    table = Table(box=box.SIMPLE_HEAVY, title=f"Gift card themes ({len(content)})")
+    if total := meta.get("total"):
+        table.caption = f"{total} total"
+    table.add_column("id", justify="right", style="cyan")
+    table.add_column("title")
+    table.add_column("theme", style="dim")
+    table.add_column("image", style="dim")
+    for card in content:
+        table.add_row(
+            str(card.get("id", "-")),
+            str(card.get("title", "-")),
+            str(card.get("theme", "-")),
+            str(card.get("image", "-")),
+        )
+    console.print(table)
 
 
 @app.command("ga")

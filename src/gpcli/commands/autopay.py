@@ -11,6 +11,7 @@ from gpcli.context import get_context
 from gpcli.errors import MyGPError
 from gpcli.render import (
     console,
+    plural,
     render_autopay_list,
     render_autopay_products,
     render_payment_methods,
@@ -95,7 +96,7 @@ def setup(
             "--provider and --identifier are required (discover values via `gpcli autopay methods`)"
         )
     start_date = date.fromisoformat(start_from) if start_from else None
-    mode = f"scheduled every {frequency} days" if frequency else "on low balance"
+    mode = f"scheduled every {plural(frequency, 'day')}" if frequency else "on low balance"
     when = start_date or "tomorrow"
     if not yes and not typer.confirm(
         f"Set up autopay: {amount} BDT -> {msisdn} ({mode}, starting {when})?"

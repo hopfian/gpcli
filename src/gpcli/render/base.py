@@ -39,5 +39,10 @@ def _fmt_mb(mb: int) -> str:
     return f"{mb / 1024:g} GB" if mb and mb % 1024 == 0 else f"{mb} MB"
 
 
+def plural(n: int, word: str) -> str:
+    """`1 day` / `2 days` — pluralize a count-word pair."""
+    return f"{n} {word}" if n == 1 else f"{n} {word}s"
+
+
 def render_dict(title: str, data: Any) -> None:
     console.print_json(data=data) if isinstance(data, (dict, list)) else console.print(str(data))

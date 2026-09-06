@@ -13,7 +13,7 @@ from gpcli.render.account import (
     render_login_success,
     render_me,
 )
-from gpcli.render.base import _fmt_panel_grid, console, render_dict
+from gpcli.render.base import _fmt_panel_grid, console, plural, render_dict
 from gpcli.render.billing import (
     render_autopay_list,
     render_autopay_products,
@@ -35,6 +35,7 @@ from gpcli.render.content import render_cards, render_districts, render_news
 __all__ = [
     # base
     "console",
+    "plural",
     "render_dict",
     "_fmt_panel_grid",  # shared by command files (public primitive, legacy name)
     # account
