@@ -7,7 +7,7 @@ from rich import box
 from rich.table import Table
 
 from gpcli.context import get_context
-from gpcli.render import _fmt_panel_grid, console
+from gpcli.render import _fmt_panel_grid, console, render_action_response
 from gpcli.services.offers import OffersService
 
 app = typer.Typer(help="Offers: gifts, gift cards, GA (new-SIM) offers, pay-as-you-go")
@@ -131,4 +131,10 @@ def payg_toggle(
     ctx = get_context()
     with ctx.client() as client:
         result = OffersService(client).payg_toggle(action == "on")
-    console.print_json(data=result)
+    if ctx.json_out:
+        console.print_json(data=result)
+        return
+    if not render_action_response(result, title=f"PAYG internet {action}", rows=[
+        ("action", action),
+    ]):
+        raise typer.Exit(1)

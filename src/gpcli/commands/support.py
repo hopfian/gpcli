@@ -7,7 +7,7 @@ import webbrowser
 import typer
 
 from gpcli.context import get_context
-from gpcli.render import _fmt_panel_grid, console
+from gpcli.render import _fmt_panel_grid, console, render_action_response
 from gpcli.services.partners import PartnerService
 
 app = typer.Typer(help="Support: email form and live chat")
@@ -24,7 +24,15 @@ def form(
     ctx = get_context()
     with ctx.client() as client:
         result = PartnerService(client).send_support(name, email, issue_type, message)
-    console.print_json(data=result)
+    if ctx.json_out:
+        console.print_json(data=result)
+        return
+    if not render_action_response(result, title="Support form sent", rows=[
+        ("name", name),
+        ("email", email),
+        ("issue type", issue_type),
+    ]):
+        raise typer.Exit(1)
 
 
 @app.command("chat")

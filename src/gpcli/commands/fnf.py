@@ -7,7 +7,7 @@ from rich import box
 from rich.table import Table
 
 from gpcli.context import get_context
-from gpcli.render import _fmt_panel_grid, console
+from gpcli.render import _fmt_panel_grid, console, render_action_response
 from gpcli.services.fnf import FnfService
 
 app = typer.Typer(help="Friends & Family: list, add, remove")
@@ -52,7 +52,14 @@ def add(
     ctx = get_context()
     with ctx.client() as client:
         result = FnfService(client).add(msisdn, super_fnf=super_fnf)
-    console.print_json(data=result)
+    if ctx.json_out:
+        console.print_json(data=result)
+        return
+    if not render_action_response(result, title="FnF add", rows=[
+        ("number", msisdn),
+        ("type", "super" if super_fnf else "normal"),
+    ]):
+        raise typer.Exit(1)
 
 
 @app.command()
@@ -64,4 +71,11 @@ def remove(
     ctx = get_context()
     with ctx.client() as client:
         result = FnfService(client).remove(msisdn, super_fnf=super_fnf)
-    console.print_json(data=result)
+    if ctx.json_out:
+        console.print_json(data=result)
+        return
+    if not render_action_response(result, title="FnF remove", rows=[
+        ("number", msisdn),
+        ("type", "super" if super_fnf else "normal"),
+    ]):
+        raise typer.Exit(1)

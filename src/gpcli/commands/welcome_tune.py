@@ -7,7 +7,7 @@ from rich import box
 from rich.table import Table
 
 from gpcli.context import get_context
-from gpcli.render import _fmt_panel_grid, console
+from gpcli.render import _fmt_panel_grid, console, render_action_response
 from gpcli.services.welcome_tune import WelcomeTuneService
 
 app = typer.Typer(help="Welcome Tune: status, list, search, activate, deactivate")
@@ -88,7 +88,13 @@ def activate(
     ctx = get_context()
     with ctx.client() as client:
         result = WelcomeTuneService(client).activate(tone_code)
-    console.print_json(data=result)
+    if ctx.json_out:
+        console.print_json(data=result)
+        return
+    if not render_action_response(result, title="Welcome Tune activate", rows=[
+        ("tone code", tone_code),
+    ]):
+        raise typer.Exit(1)
 
 
 @app.command()
@@ -97,4 +103,8 @@ def deactivate() -> None:
     ctx = get_context()
     with ctx.client() as client:
         result = WelcomeTuneService(client).deactivate()
-    console.print_json(data=result)
+    if ctx.json_out:
+        console.print_json(data=result)
+        return
+    if not render_action_response(result, title="Welcome Tune deactivate"):
+        raise typer.Exit(1)

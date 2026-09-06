@@ -4,6 +4,26 @@ All notable changes to this project are documented here. The format is
 based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.11.0] — 2026-09-06
+
+### Changed
+- **Every command now renders for humans** — the last 18 commands that
+  dumped raw JSON in human mode were converted to panels/tables
+  (JSON remains available under `--json` everywhere):
+  - mutations render through a shared action-response renderer that judges
+    the server's `{code, status, message}` envelope (status vocabulary
+    wins, bare `code` checks 200, non-envelope 2xx payloads pass) and
+    exits 1 on failure: `fnf add/remove`, `vas activate/deactivate/
+    stop-all`, `autorenew set`, `offers payg`, `wt activate/deactivate`,
+    `netcare submit`, `support form`, `recharge unbind`, `autopay
+    setup/cancel/update`
+  - reads got bespoke renderers: `autopay validate` (eligibility panel),
+    `netcare detail` (scalar summary + JSON pointer), `partners
+    search/contents` (content table with a defensive empty state),
+    `partners win/chatbot` (token panels), `partners zee5` (summary
+    instead of a raw contents dump), `config show` (panel)
+- `raw call` is the one intentional exception: JSON is its contract.
+
 ## [1.10.1] — 2026-09-06
 
 ### Fixed

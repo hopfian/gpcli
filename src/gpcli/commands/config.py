@@ -5,7 +5,7 @@ from __future__ import annotations
 import typer
 
 from gpcli.context import get_context
-from gpcli.render import console
+from gpcli.render import _fmt_panel_grid, console
 
 app = typer.Typer(help="Device identity and preferences")
 
@@ -15,13 +15,22 @@ def show() -> None:
     """Show the current configuration."""
     ctx = get_context()
     state = ctx.state
-    console.print_json(data={
-        "device_id": state.device.device_id,
-        "device_model": state.device.device_model,
-        "device_name": state.device.device_name,
-        "language": state.language,
-        "state_path": str(state.path),
-    })
+    if ctx.json_out:
+        console.print_json(data={
+            "device_id": state.device.device_id,
+            "device_model": state.device.device_model,
+            "device_name": state.device.device_name,
+            "language": state.language,
+            "state_path": str(state.path),
+        })
+        return
+    console.print(_fmt_panel_grid("Configuration", [
+        ("device id", state.device.device_id),
+        ("device model", state.device.device_model),
+        ("device name", state.device.device_name),
+        ("language", state.language),
+        ("state path", str(state.path)),
+    ]))
 
 
 @app.command("set")

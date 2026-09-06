@@ -9,7 +9,7 @@ from rich import box
 from rich.table import Table
 
 from gpcli.context import get_context
-from gpcli.render import console
+from gpcli.render import _fmt_panel_grid, console, render_action_response
 from gpcli.services.netcare import NetworkComplainService
 
 app = typer.Typer(help="Network complaints: list, detail, questionnaires, submit")
@@ -44,7 +44,21 @@ def detail(feedback_id: str = typer.Argument(...)) -> None:
     ctx = get_context()
     with ctx.client() as client:
         result = NetworkComplainService(client).feedback(feedback_id)
-    console.print_json(data=result)
+    if ctx.json_out:
+        console.print_json(data=result)
+        return
+    if not isinstance(result, dict) or not result:
+        console.print("[dim]no complaint detail[/dim]")
+        return
+    rows = []
+    for key, value in result.items():
+        if isinstance(value, (dict, list)):
+            summary = f"{len(value)} entries" if value else "-"
+            rows.append((key, summary))
+        else:
+            rows.append((key, "-" if value in (None, "") else str(value)[:60]))
+    console.print(_fmt_panel_grid(f"Complaint {feedback_id}", rows))
+    console.print("[dim]full detail: gpcli --json netcare detail[/dim]")
 
 
 @app.command()
@@ -99,4 +113,10 @@ def submit(
     ctx = get_context()
     with ctx.client() as client:
         result = NetworkComplainService(client).submit(parsed, meta=meta_obj)
-    console.print_json(data=result)
+    if ctx.json_out:
+        console.print_json(data=result)
+        return
+    if not render_action_response(result, title="Complaint submitted", rows=[
+        ("answers", str(len(parsed))),
+    ]):
+        raise typer.Exit(1)

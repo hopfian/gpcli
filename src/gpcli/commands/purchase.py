@@ -10,7 +10,7 @@ from rich.table import Table
 
 from gpcli.context import get_context
 from gpcli.msisdn import local_msisdn
-from gpcli.render import _fmt_panel_grid, console
+from gpcli.render import _fmt_panel_grid, console, render_action_response
 from gpcli.services.autopay import AutoPayService
 from gpcli.services.purchase import PurchaseService
 
@@ -288,7 +288,14 @@ def unbind(
             console.print("[dim]aborted[/dim]")
             raise typer.Exit(1)
         result = service.unbind_payment_method(method_id, resolved)
-    console.print_json(data=result)
+    if ctx.json_out:
+        console.print_json(data=result)
+        return
+    if not render_action_response(result, title="Payment method unbound", rows=[
+        ("method", method_id),
+        ("identifier", resolved),
+    ]):
+        raise typer.Exit(1)
 
 
 @recharge_app.command()

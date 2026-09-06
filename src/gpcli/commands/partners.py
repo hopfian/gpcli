@@ -2,10 +2,14 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 import typer
+from rich import box
+from rich.table import Table
 
 from gpcli.context import get_context
-from gpcli.render import _fmt_panel_grid, console
+from gpcli.render import _fmt_panel_grid, console, plural
 from gpcli.services.partners import PartnerService
 
 app = typer.Typer(help="Partner tokens: ibadah, win, chatbot, DRM, Zee5, content search")
@@ -33,7 +37,14 @@ def win() -> None:
     ctx = get_context()
     with ctx.client() as client:
         result = PartnerService(client).win_token()
-    console.print_json(data=result.model_dump())
+    if ctx.json_out:
+        console.print_json(data=result.model_dump())
+        return
+    console.print(_fmt_panel_grid("WIN token", [
+        ("token", result.token[:24] + "..." if result.token else "-"),
+        ("url", result.url or "-"),
+        ("type", result.type or "-"),
+    ]))
 
 
 @app.command("chatbot")
@@ -42,7 +53,14 @@ def chatbot() -> None:
     ctx = get_context()
     with ctx.client() as client:
         result = PartnerService(client).chatbot_token()
-    console.print_json(data=result.model_dump())
+    if ctx.json_out:
+        console.print_json(data=result.model_dump())
+        return
+    console.print(_fmt_panel_grid("Chatbot token", [
+        ("token", result.token[:24] + "..." if result.token else "-"),
+        ("url", result.url or "-"),
+        ("type", result.type or "-"),
+    ]))
 
 
 @app.command("drm")
@@ -73,8 +91,43 @@ def zee5() -> None:
         console.print_json(data={"token": token, "contents": contents})
         return
     shown = token[:24] + "..." if token else "-"
-    console.print(_fmt_panel_grid("Zee5", [("token", shown)]))
-    console.print_json(data=contents)
+    console.print(_fmt_panel_grid("Zee5", [
+        ("token", shown),
+        ("contents", plural(_content_count(contents), "item")),
+    ]))
+
+
+def _content_items(result: Any, partner: str) -> list[dict]:
+    """Extract content rows from the {data: [{partner: [...]}]} wrapper."""
+    if not isinstance(result, dict):
+        return []
+    data = result.get("data")
+    if isinstance(data, list) and data and isinstance(data[0], dict):
+        items = data[0].get(partner)
+        if isinstance(items, list):
+            return [i for i in items if isinstance(i, dict)]
+    return []
+
+
+def _content_count(contents: Any) -> int:
+    if isinstance(contents, list):
+        return len(contents)
+    if isinstance(contents, dict):
+        return _content_count(contents.get("data"))
+    return 0
+
+
+def _render_contents(result: Any, partner: str, *, title: str) -> None:
+    items = _content_items(result, partner)
+    if not items:
+        console.print(f"[dim]no contents for {partner}[/dim]")
+        return
+    table = Table(box=box.SIMPLE_HEAVY, title=f"{title} ({len(items)})")
+    for column in list(items[0])[:6]:
+        table.add_column(column)
+    for item in items[:40]:
+        table.add_row(*[str(item.get(c, "-"))[:28] for c in list(items[0])[:6]])
+    console.print(table)
 
 
 @app.command("search")
@@ -90,7 +143,10 @@ def sbsearch(
         result = PartnerService(client).sbcontents_search(
             partner, offset=offset, limit=limit, genre=genre
         )
-    console.print_json(data=result)
+    if ctx.json_out:
+        console.print_json(data=result)
+        return
+    _render_contents(result, partner, title=f"{partner} search")
 
 
 @app.command("contents")
@@ -103,4 +159,7 @@ def sbcontents(
     ctx = get_context()
     with ctx.client() as client:
         result = PartnerService(client).sbcontents_partner(partner, offset=offset, limit=limit)
-    console.print_json(data=result)
+    if ctx.json_out:
+        console.print_json(data=result)
+        return
+    _render_contents(result, partner, title=f"{partner} contents")

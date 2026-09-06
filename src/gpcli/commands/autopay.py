@@ -10,8 +10,10 @@ from rich.panel import Panel
 from gpcli.context import get_context
 from gpcli.errors import MyGPError
 from gpcli.render import (
+    _fmt_panel_grid,
     console,
     plural,
+    render_action_response,
     render_autopay_list,
     render_autopay_products,
     render_payment_methods,
@@ -73,9 +75,25 @@ def recent() -> None:
 def validate(msisdn: str) -> None:
     """Check a number's autopay eligibility (GP/skitto, connection type, EB due)."""
     normalized = normalize_msisdn(msisdn)
-    with get_context().client() as client:
+    ctx = get_context()
+    with ctx.client() as client:
         result = AutoPayService(client).validate_msisdn(normalized)
-    console.print_json(data=result)
+    if ctx.json_out:
+        console.print_json(data=result)
+        return
+    data = result.get("data") if isinstance(result, dict) else None
+    data = data if isinstance(data, dict) else {}
+    eb = data.get("emergency_balance") or {}
+    eligible = data.get("is_gp") and not data.get("is_skitto") and data.get("connection_type")
+    verdict = "[green]eligible[/green]" if eligible else "[red]not eligible[/red]"
+    console.print(_fmt_panel_grid(f"Autopay eligibility — {msisdn}", [
+        ("verdict", verdict),
+        ("is gp", "yes" if data.get("is_gp") else "no"),
+        ("is skitto", "yes" if data.get("is_skitto") else "no"),
+        ("connection type", str(data.get("connection_type", "-"))),
+        ("service class", str(data.get("service_class", "-"))),
+        ("eb due", str(eb.get("due", "-")) if isinstance(eb, dict) else "-"),
+    ]))
 
 
 @app.command()
@@ -113,7 +131,17 @@ def setup(
             frequency=frequency or None,
             start_from=start_date,
         )
-    console.print_json(data=result)
+    ctx = get_context()
+    if ctx.json_out:
+        console.print_json(data=result)
+        return
+    if not render_action_response(result, title="Autopay created", rows=[
+        ("number", msisdn),
+        ("amount", f"{amount} BDT"),
+        ("mode", mode),
+        ("starts", str(when)),
+    ]):
+        raise typer.Exit(1)
 
 
 @app.command()
@@ -133,7 +161,15 @@ def cancel(
                 "could not resolve the provisioning number — pass --msisdn (see `gpcli autopay list`)"
             )
         result = service.cancel(subscription_id, msisdn)
-    console.print_json(data=result)
+    ctx = get_context()
+    if ctx.json_out:
+        console.print_json(data=result)
+        return
+    if not render_action_response(result, title="Autopay cancelled", rows=[
+        ("subscription", str(subscription_id)),
+        ("number", msisdn),
+    ]):
+        raise typer.Exit(1)
 
 
 @app.command()
@@ -177,4 +213,12 @@ def update(
         except MyGPError as err:
             console.print(f"[red]update failed:[/red] {err}")
             raise typer.Exit(1) from err
-    console.print_json(data=result)
+    ctx = get_context()
+    if ctx.json_out:
+        console.print_json(data=result)
+        return
+    if not render_action_response(result, title="Autopay updated", rows=[
+        ("subscription", str(subscription_id)),
+        ("amount", f"{amount} BDT"),
+    ]):
+        raise typer.Exit(1)

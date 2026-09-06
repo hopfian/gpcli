@@ -7,7 +7,7 @@ from rich import box
 from rich.table import Table
 
 from gpcli.context import get_context
-from gpcli.render import console
+from gpcli.render import console, render_action_response
 from gpcli.services.offers import OffersService
 
 app = typer.Typer(help="Pack auto-renew: status and toggling")
@@ -55,4 +55,11 @@ def set_renew(
     ctx = get_context()
     with ctx.client() as client:
         result = OffersService(client).set_auto_renew(product_short_code, action == "on")
-    console.print_json(data=result)
+    if ctx.json_out:
+        console.print_json(data=result)
+        return
+    if not render_action_response(result, title="Auto-renew", rows=[
+        ("pack", product_short_code),
+        ("action", action),
+    ]):
+        raise typer.Exit(1)

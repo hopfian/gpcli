@@ -7,6 +7,7 @@ import typer
 from gpcli.context import get_context
 from gpcli.render import (
     console,
+    render_action_response,
     render_vas_categories,
     render_vas_items,
     render_vas_services,
@@ -77,7 +78,15 @@ def vas_activate(
         result = OffersService(client).vas_activate(
             {"service_id": service_id, "charge_code": charge_code, "partner": partner}
         )
-    console.print_json(data=result)
+    if ctx.json_out:
+        console.print_json(data=result)
+        return
+    if not render_action_response(result, title="VAS activate", rows=[
+        ("service id", service_id),
+        ("charge code", charge_code or "-"),
+        ("partner", partner or "-"),
+    ]):
+        raise typer.Exit(1)
 
 
 @app.command("deactivate")
@@ -92,7 +101,15 @@ def vas_deactivate(
         result = OffersService(client).vas_deactivate(
             {"service_id": service_id, "charge_code": charge_code, "partner": partner}
         )
-    console.print_json(data=result)
+    if ctx.json_out:
+        console.print_json(data=result)
+        return
+    if not render_action_response(result, title="VAS deactivate", rows=[
+        ("service id", service_id),
+        ("charge code", charge_code or "-"),
+        ("partner", partner or "-"),
+    ]):
+        raise typer.Exit(1)
 
 
 @app.command("stop-all")
@@ -110,4 +127,10 @@ def vas_stop_all(yes: bool = typer.Option(False, "--yes", "-y")) -> None:
                 console.print("[dim]aborted[/dim]")
                 raise typer.Exit(1)
         result = OffersService(client).vas_stop_all(services)
-    console.print_json(data=result)
+    if ctx.json_out:
+        console.print_json(data=result)
+        return
+    if not render_action_response(result, title="VAS stop-all", rows=[
+        ("subscriptions", str(len(services))),
+    ]):
+        raise typer.Exit(1)
